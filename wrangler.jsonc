@@ -1,0 +1,62 @@
+{
+  "name": "zenos-api",
+  "main": "src/index.py",
+  "compatibility_date": "2024-12-01",
+  "compatibility_flags": ["python_workers"],
+
+  "vars": {
+    "ENVIRONMENT": "production",
+    "FRONTEND_URL": "https://zenos.work"
+  },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "prd-zenos-blog-db",
+      "database_id": "fa9659e2-584d-478f-97b9-2bcfdae5f309"
+    }
+  ],
+
+  "r2_buckets": [
+    {
+      "binding": "MEDIA",
+      "bucket_name": "prd-zenos-blog-media"
+    }
+  ],
+
+  "kv_namespaces": [
+    {
+      "binding": "SESSIONS",
+      "id": "fdb0231343a341f489c2f2c876b5a7e4"
+    }
+  ],
+
+  "env": {
+    "staging": {
+      "name": "zenos-api-staging",
+      "vars": {
+        "ENVIRONMENT": "staging",
+        "FRONTEND_URL": "https://staging.zenos.work"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "staging-zenos-blog-db",
+          "database_id": "4aa50a0e-58a7-4898-874d-63859e6b5f11"
+        }
+      ],
+      "r2_buckets": [
+        {
+          "binding": "MEDIA",
+          "bucket_name": "staging-zenos-blog-media"
+        }
+      ],
+      "kv_namespaces": [
+        {
+          "binding": "SESSIONS",
+          "id": "4d1a91063b3340b0aee7212bbfff80c5"
+        }
+      ]
+    }
+  }
+}
