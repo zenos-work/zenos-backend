@@ -1,7 +1,7 @@
 import json
 import base64
 from js import fetch as js_fetch, Headers
-from utils.logger import LogEntry
+from .log_models import LogEntry
 
 
 class LokiForwarder:
