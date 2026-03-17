@@ -1,0 +1,6 @@
+from typing import Protocol
+
+
+class IMediaService(Protocol):
+    async def upload(self, user_id: str, request) -> dict: ...
+    async def delete(self, user_id: str, key: str, is_superadmin: bool) -> None: ...

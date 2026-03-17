@@ -1,22 +1,25 @@
 # Zenos Backend
 
 This repository contains the Cloudflare Workers–based backend for the Zenos
-platform.  It provides authentication services and a thin API layer that
-stores users in a SQLite database and issues JSON Web Tokens (JWTs).
+platform written in Python. It provides:
+
+* Authentication (Google OAuth2 + JWT)
+* User management (profiles, avatars, roles, preferences)
+* Content APIs (articles, comments, tags, search)
+* Admin functions (user management, content moderation)
+* Media storage (R2 for avatars, images)
+* Session management (KV for refresh tokens)
 
 ## Overview
 
-The service is written in Python and runs on Cloudflare's Workers runtime via
-`wrangler`.  It uses:
+The service runs on Cloudflare's Workers runtime via `wrangler` and uses:
 
-* `js` bindings for request/response objects
-* an in-process SQLite database for user persistence (`env.DB`)
-* a KV namespace (`env.SESSIONS`) for storing refresh tokens
-* Google OAuth2 for login
+* Python FastAPI framework (compiled to Cloudflare Workers)
+* SQLite database for persistence (`env.DB`)
+* Cloudflare KV namespace for session storage (`env.SESSIONS`)
+* Cloudflare R2 for media uploads (`env.MEDIA`)
+* Google OAuth2 for authentication
 * JWTs for stateless access control
-
-At present only authentication endpoints are implemented; additional
-business logic can be mounted in `src/*` with the same pattern.
 
 ## Getting Started
 
@@ -27,56 +30,81 @@ business logic can be mounted in `src/*` with the same pattern.
    uv sync
    ```
 3. Configure your editor to use the `.venv` folder for Python.
-4. Set up a `wrangler.toml` file with the following bindings:
-   ```toml
+4. Set up a `wrangler.jsonc` file with the following environment:
+   ```jsonc
    [env.dev]
-   vars = {
-     GOOGLE_CLIENT_ID = "...",
-     JWT_SECRET = "...",
-     FRONTEND_URL = "http://localhost:3000"
+   "vars": {
+     "ENVIRONMENT": "development",
+     "FRONTEND_URL": "http://localhost:5173",
+     "GOOGLE_CLIENT_ID": "your-google-client-id",
+     "JWT_SECRET": "your-secret-key"
    }
-
-   [[kv_namespaces]]
-   binding = "SESSIONS"
-   id = "..."
    ```
 5. Start the development server:
    ```sh
    wrangler dev
    ```
 
-   The worker will listen for HTTP requests, which you can exercise with curl
-   or via the frontend.
+   The worker will listen on http://localhost:8787
 
-## Authentication Flow
+## Project Structure
 
-Users sign in using Google OAuth2.  The flow is illustrated in the
-sequence diagram below:
-
-```mermaid
-sequenceDiagram
-    participant B as Browser
-    participant F as Frontend
-    participant A as Auth Worker
-    participant G as Google
-
-    B->>F: Click "Sign in with Google"
-    F->>A: GET /auth/google/login
-    A->>G: Redirect to consent screen
-    G->>B: Consent page -> code
-    B->>F: POST /auth/google/callback {code}
-    F->>A: POST /auth/google/callback {code}
-    A->>G: Exchange code for tokens & userinfo
-    A->>DB: Upsert user record
-    A->>F: 200 {access_token, user}
-    F->>B: Save tokens in local storage
+```
+src/
+├── auth/                  # Google OAuth2 + JWT tokens
+│   ├── google.py         # Google OAuth exchange
+│   ├── jwt_handler.py    # Token generation/verification
+│   ├── models.py         # Auth data models
+│   └── router.py         # Auth endpoints (login, callback, refresh)
+│
+├── api/                   # REST API modules
+│   ├── users/            # User profiles, avatars, roles ✅
+│   ├── articles/         # Article CRUD + approval workflow
+│   ├── comments/         # Threaded discussions
+│   ├── tags/             # Content tagging
+│   ├── social/           # Likes, follows, bookmarks
+│   ├── feed/             # Interest-based feed
+│   ├── media/            # R2 upload management
+│   └── admin/            # Superadmin functions
+│
+├── models/               # Data classes
+│   ├── user/             # User, role models
+│   ├── article/          # Article models
+│   ├── common/           # Enums, base classes
+│   └── base.py           # BaseModel, BaseRequest
+│
+├── middleware/           # Auth, logging middleware
+├── db/                   # Database layer
+└── utils/                # Helpers, validation
 ```
 
-```mermaid
-usecaseDiagram
-    actor Browser
-    actor Frontend
-    actor "Auth Worker" as Worker
+## API Modules
+
+### ✅ Users (Complete - 16 endpoints)
+Profile management, avatars, roles, preferences
+- `GET /api/users/:id` — Public profile
+- `GET /api/users/me` — My profile
+- `PUT /api/users/me` — Update profile
+- `POST /api/users/me/avatar` — Upload avatar
+- `DELETE /api/users/me/avatar` — Remove avatar
+- Plus: preferences, role management, terms, admin functions
+
+📖 [Users API Docs](./src/api/users/API.md) | [Quick Reference](./src/api/users/QUICK_REFERENCE.md)
+
+### 🟡 Articles (In Progress - 60%)
+Content creation, draft/publish workflow, approval system
+
+### 🟡 Comments (In Progress - 40%)
+Threaded discussions, moderation
+
+### ✅ Tags (Complete - 100%)
+Content organization
+
+### 🟡 Other Modules (20-40%)
+- Social (likes, follows, bookmarks)
+- Feed (recommendation engine)
+- Media (R2 integration)
+- Admin (governance, stats)
 
     Browser --> Frontend : "Login with Google"
     Frontend --> Worker : "POST /auth/google/callback"

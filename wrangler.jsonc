@@ -32,6 +32,13 @@
   ],
 
   "env": {
+    "dev": {
+      "name": "zenos-api-dev",
+      "vars": {
+        "ENVIRONMENT": "development",
+        "FRONTEND_URL": "http://localhost:5173"
+      }
+    },
     "staging": {
       "name": "zenos-api-staging",
       "vars": {

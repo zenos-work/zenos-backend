@@ -1,0 +1,79 @@
+from db.repository import BaseRepository
+from api.social import queries as Q
+from models.article.model import Article
+from models.user.model import User
+from models.base import row_get
+
+
+class SocialRepository(BaseRepository):
+    """Handles all database operations for likes, bookmarks, follows."""
+
+    # ── LIKES ──────────────────────────────────────
+    async def like(self, user_id: str, article_id: str) -> None:
+        await self.execute(Q.INSERT_LIKE, user_id, article_id)
+
+    async def unlike(self, user_id: str, article_id: str) -> None:
+        await self.execute(Q.DELETE_LIKE, user_id, article_id)
+
+    async def has_liked(self, user_id: str, article_id: str) -> bool:
+        """Check if user has liked an article."""
+        row = await self.find_one(Q.SELECT_IF_LIKED, user_id, article_id)
+        return bool(row)
+
+    async def count_likes(self, article_id: str) -> int:
+        """Count total likes for an article."""
+        row = await self.find_one(Q.COUNT_LIKES, article_id)
+        return row_get(row, "count", 0) if row else 0
+
+    # ── BOOKMARKS ──────────────────────────────────
+    async def bookmark(self, user_id: str, article_id: str) -> None:
+        await self.execute(Q.INSERT_BOOKMARK, user_id, article_id)
+
+    async def unbookmark(self, user_id: str, article_id: str) -> None:
+        await self.execute(Q.DELETE_BOOKMARK, user_id, article_id)
+
+    async def has_bookmarked(self, user_id: str, article_id: str) -> bool:
+        """Check if user has bookmarked an article."""
+        row = await self.find_one(Q.SELECT_IF_BOOKMARKED, user_id, article_id)
+        return bool(row)
+
+    async def find_bookmarks(self, user_id: str, limit: int, offset: int) -> list:
+        rows = await self.find_all(Q.SELECT_BOOKMARKS_BY_USER, user_id, limit, offset)
+        return self.map_many(rows, Article)
+
+    async def count_bookmarks(self, user_id: str) -> int:
+        """Count total bookmarks for a user."""
+        row = await self.find_one(Q.COUNT_BOOKMARKS, user_id)
+        return row_get(row, "count", 0) if row else 0
+
+    # ── FOLLOWS ────────────────────────────────────
+    async def follow(self, follower_id: str, following_id: str) -> None:
+        await self.execute(Q.INSERT_FOLLOW, follower_id, following_id)
+
+    async def unfollow(self, follower_id: str, following_id: str) -> None:
+        await self.execute(Q.DELETE_FOLLOW, follower_id, following_id)
+
+    async def is_following(self, follower_id: str, following_id: str) -> bool:
+        """Check if user is following another user."""
+        row = await self.find_one(Q.SELECT_IF_FOLLOWING, follower_id, following_id)
+        return bool(row)
+
+    async def find_followers(self, user_id: str, limit: int, offset: int) -> list:
+        """Get paginated list of users following a user."""
+        rows = await self.find_all(Q.SELECT_FOLLOWERS, user_id, limit, offset)
+        return self.map_many(rows, User)
+
+    async def count_followers(self, user_id: str) -> int:
+        """Count followers for a user."""
+        row = await self.find_one(Q.COUNT_FOLLOWERS, user_id)
+        return row_get(row, "count", 0) if row else 0
+
+    async def find_following(self, user_id: str, limit: int, offset: int) -> list:
+        """Get paginated list of users that a user is following."""
+        rows = await self.find_all(Q.SELECT_FOLLOWING, user_id, limit, offset)
+        return self.map_many(rows, User)
+
+    async def count_following(self, user_id: str) -> int:
+        """Count users that a user is following."""
+        row = await self.find_one(Q.COUNT_FOLLOWING, user_id)
+        return row_get(row, "count", 0) if row else 0

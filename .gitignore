@@ -4,6 +4,9 @@ __pycache__/
 *$py.class
 .pyc
 
+# File: zenos-db/migrations/0002_users.sql
+python_modules/
+python_modules
 # C extensions
 *.so
 
