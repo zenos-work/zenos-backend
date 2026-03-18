@@ -39,10 +39,13 @@ async def handle_auth(request, env, path: str):
                 f"&redirect_uri={env.FRONTEND_URL}/auth/google/callback"
             )
             headers = Headers.new(
-                {
-                    "Location": redirect_url,
-                    "Access-Control-Allow-Origin": resolve_allowed_origin(env, request),
-                }
+                [
+                    ("Location", redirect_url),
+                    (
+                        "Access-Control-Allow-Origin",
+                        resolve_allowed_origin(env, request),
+                    ),
+                ]
             )
             return Response.new("", status=302, headers=headers)
 
