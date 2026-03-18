@@ -1,3 +1,5 @@
+import traceback
+
 from utils.forwarder import make_forwarder
 from .log_models import LogEntry, LogLevel, LogType
 
@@ -38,6 +40,10 @@ class Logger:
         await self._emit(self._build(LogLevel.WARN, LogType.EVENT, msg, **kw))
 
     async def error(self, msg, exc: Exception = None, **kw):
+        frames = (
+            traceback.extract_tb(exc.__traceback__) if exc and exc.__traceback__ else []
+        )
+        last_frame = frames[-1] if frames else None
         await self._emit(
             self._build(
                 LogLevel.ERROR,
@@ -45,6 +51,16 @@ class Logger:
                 msg,
                 error_type=type(exc).__name__ if exc else None,
                 error_msg=str(exc) if exc else None,
+                error_file=last_frame.filename if last_frame else None,
+                error_line=last_frame.lineno if last_frame else None,
+                error_function=last_frame.name if last_frame else None,
+                error_traceback=(
+                    "".join(
+                        traceback.format_exception(type(exc), exc, exc.__traceback__)
+                    )
+                    if exc
+                    else None
+                ),
                 **kw,
             )
         )

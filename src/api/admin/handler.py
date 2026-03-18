@@ -25,14 +25,15 @@ async def handle_admin(request, env, path, method, query, ctx):
     if method == "GET" and section == "queue":
         if not require_role(user, UserRole.CAN_APPROVE):
             return error("Forbidden", 403)
-        return json_resp({"queue": await svc.get_approval_queue()})
+        page = int(query.get("page", ["1"])[0])
+        return json_resp(await svc.get_approval_queue(page))
 
     # GET /api/admin/users — SUPERADMIN
     if method == "GET" and section == "users":
         if not require_role(user, ["SUPERADMIN"]):
             return error("Forbidden", 403)
         page = int(query.get("page", ["1"])[0])
-        return json_resp({"users": await svc.list_users(page)})
+        return json_resp(await svc.list_users(page))
 
     # PUT /api/admin/users/:id/ban
     if method == "PUT" and section == "users" and target and action == "ban":
@@ -51,8 +52,7 @@ async def handle_admin(request, env, path, method, query, ctx):
     # GET /api/admin/notifications — own notifications
     if method == "GET" and section == "notifications":
         page = int(query.get("page", ["1"])[0])
-        notifications = await svc.get_notifications(user["sub"], page)
-        return json_resp({"notifications": notifications})
+        return json_resp(await svc.get_notifications(user["sub"], page))
 
     # PUT /api/admin/notifications/read
     if method == "PUT" and section == "notifications" and target == "read":

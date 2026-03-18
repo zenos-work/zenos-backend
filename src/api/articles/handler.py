@@ -28,6 +28,18 @@ async def handle_articles(request, env, path, method, query, ctx):
         )
         return json_resp(result.to_dict())
 
+    # GET /api/articles/mine
+    if method == "GET" and art_id == "mine":
+        user = await get_user(request, env)
+        if not user:
+            return error("Unauthorised", 401)
+        page = int(query.get("page", ["1"])[0])
+        limit = int(query.get("limit", ["20"])[0])
+        status = query.get("status", [None])[0]
+        limit = min(limit, 100)
+        result = await svc.list_by_author(user["sub"], page, limit, status)
+        return json_resp(result.to_dict())
+
     # GET /api/articles/:id
     if method == "GET" and art_id and not action:
         article = await svc.get_by_id_or_slug(art_id)
@@ -93,7 +105,8 @@ async def handle_articles(request, env, path, method, query, ctx):
             return error("Article not found", 404)
 
         # POST /api/articles/:id/submit
-        if action == "submit":
+        # POST /api/articles/:id/submit-for-approval
+        if action in {"submit", "submit-for-approval"}:
             if article.author_id != user["sub"]:
                 return error("Forbidden", 403)
             if article.status not in ArticleStatus.EDITABLE:

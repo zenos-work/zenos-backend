@@ -4,7 +4,12 @@ from models.base import BaseModel, row_get
 from models.common.enums import Scope
 
 _PUBLIC_FIELDS = {"id", "name", "role", "avatar_url", "created_at"}
-_PRIVATE_FIELDS = _PUBLIC_FIELDS | {"email", "is_active", "updated_at"}
+_PRIVATE_FIELDS = _PUBLIC_FIELDS | {
+    "email",
+    "is_active",
+    "updated_at",
+    "terms_accepted_at",
+}
 _ADMIN_FIELDS = _PRIVATE_FIELDS | {"google_id"}
 
 _SCOPE_MAP = {
@@ -25,6 +30,7 @@ class User(BaseModel):
     updated_at: str
     avatar_url: Optional[str] = None
     google_id: Optional[str] = None
+    terms_accepted_at: Optional[str] = None
 
     def to_dict(self, scope: str = Scope.PUBLIC) -> dict:
         allowed = _SCOPE_MAP.get(scope, _PUBLIC_FIELDS)
@@ -40,6 +46,7 @@ class User(BaseModel):
                 "google_id": self.google_id,
                 "created_at": self.created_at,
                 "updated_at": self.updated_at,
+                "terms_accepted_at": self.terms_accepted_at,
             }.items()
             if k in allowed and v is not None
         }
@@ -56,4 +63,5 @@ class User(BaseModel):
             updated_at=row_get(row, "updated_at", ""),
             avatar_url=row_get(row, "avatar_url"),
             google_id=row_get(row, "google_id"),
+            terms_accepted_at=row_get(row, "terms_accepted_at"),
         )

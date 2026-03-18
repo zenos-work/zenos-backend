@@ -14,20 +14,73 @@ class AdminRepository(BaseRepository):
         row = await self.find_one(Q.COUNT_ACTIVE_USERS)
         return row_get(row, "c", 0)
 
+    async def count_users_total(self) -> int:
+        row = await self.find_one(Q.COUNT_USERS_TOTAL)
+        return row_get(row, "c", 0)
+
+    async def count_users_by_role(self) -> list:
+        rows = await self.find_all(Q.COUNT_USERS_BY_ROLE)
+        return [
+            {
+                "role": row_get(r, "role"),
+                "c": int(row_get(r, "c", 0) or 0),
+            }
+            for r in rows
+        ]
+
     async def count_articles_by_status(self) -> list:
-        return await self.find_all(Q.COUNT_ARTICLES_BY_STATUS)
+        rows = await self.find_all(Q.COUNT_ARTICLES_BY_STATUS)
+        return [
+            {
+                "status": row_get(r, "status"),
+                "c": int(row_get(r, "c", 0) or 0),
+            }
+            for r in rows
+        ]
 
     async def count_active_comments(self) -> int:
         row = await self.find_one(Q.COUNT_ACTIVE_COMMENTS)
+        return row_get(row, "c", 0)
+
+    async def count_pending_approvals(self) -> int:
+        row = await self.find_one(Q.COUNT_PENDING_APPROVALS)
+        return row_get(row, "c", 0)
+
+    async def count_flagged_comments(self) -> int:
+        row = await self.find_one(Q.COUNT_FLAGGED_COMMENTS)
+        return row_get(row, "c", 0)
+
+    async def count_hidden_comments(self) -> int:
+        row = await self.find_one(Q.COUNT_HIDDEN_COMMENTS)
+        return row_get(row, "c", 0)
+
+    async def count_notifications_last_7d(self) -> int:
+        row = await self.find_one(Q.COUNT_NOTIFICATIONS_LAST_7D)
+        return row_get(row, "c", 0)
+
+    async def count_published_last_7d(self) -> int:
+        row = await self.find_one(Q.COUNT_PUBLISHED_LAST_7D)
+        return row_get(row, "c", 0)
+
+    async def count_approved_last_7d(self) -> int:
+        row = await self.find_one(Q.COUNT_APPROVED_LAST_7D)
+        return row_get(row, "c", 0)
+
+    async def count_rejected_last_7d(self) -> int:
+        row = await self.find_one(Q.COUNT_REJECTED_LAST_7D)
         return row_get(row, "c", 0)
 
     async def find_top_articles(self) -> list:
         rows = await self.find_all(Q.SELECT_TOP_ARTICLES, "PUBLISHED")
         return self.map_many(rows, Article)
 
-    async def find_approval_queue(self) -> list:
-        rows = await self.find_all(Q.SELECT_APPROVAL_QUEUE, "SUBMITTED")
+    async def find_approval_queue(self, limit: int, offset: int) -> list:
+        rows = await self.find_all(Q.SELECT_APPROVAL_QUEUE, "SUBMITTED", limit, offset)
         return self.map_many(rows, Article)
+
+    async def count_approval_queue(self) -> int:
+        row = await self.find_one(Q.COUNT_APPROVAL_QUEUE, "SUBMITTED")
+        return row_get(row, "c", 0)
 
     async def find_all_users(self, limit: int, offset: int) -> list:
         rows = await self.find_all(Q.SELECT_ALL_USERS_ADMIN, limit, offset)
@@ -38,6 +91,10 @@ class AdminRepository(BaseRepository):
             Q.SELECT_NOTIFICATIONS_BY_USER, user_id, limit, offset
         )
         return self.map_many(rows, Notification)
+
+    async def count_notifications(self, user_id: str) -> int:
+        row = await self.find_one(Q.COUNT_NOTIFICATIONS_BY_USER, user_id)
+        return row_get(row, "c", 0)
 
     async def insert_notification(
         self,

@@ -37,7 +37,26 @@
       "vars": {
         "ENVIRONMENT": "development",
         "FRONTEND_URL": "http://localhost:5173"
-      }
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "prd-zenos-blog-db",
+          "database_id": "fa9659e2-584d-478f-97b9-2bcfdae5f309"
+        }
+      ],
+      "r2_buckets": [
+        {
+          "binding": "MEDIA",
+          "bucket_name": "prd-zenos-blog-media"
+        }
+      ],
+      "kv_namespaces": [
+        {
+          "binding": "SESSIONS",
+          "id": "fdb0231343a341f489c2f2c876b5a7e4"
+        }
+      ]
     },
     "staging": {
       "name": "zenos-api-staging",

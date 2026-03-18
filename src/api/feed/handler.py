@@ -43,6 +43,7 @@ async def handle_feed(request, env, path, method, query, ctx):
                 "articles": [a.to_dict(Scope.LIST) for a in result["articles"]],
                 "feed": result["feed"],
                 "page": result["page"],
+                "has_more": result["has_more"],
             }
         )
 
@@ -59,6 +60,18 @@ async def handle_feed(request, env, path, method, query, ctx):
                 "articles": [a.to_dict(Scope.LIST) for a in result["articles"]],
                 "feed": result["feed"],
                 "page": result["page"],
+                "has_more": result["has_more"],
+            }
+        )
+
+    if feed_type == "trending":
+        result = await svc.trending(page)
+        return json_resp(
+            {
+                "articles": [a.to_dict(Scope.LIST) for a in result["articles"]],
+                "feed": result["feed"],
+                "page": result["page"],
+                "has_more": result["has_more"],
             }
         )
 

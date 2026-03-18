@@ -38,6 +38,10 @@ class LogEntry:
     event_data: Optional[dict] = None
     error_type: Optional[str] = None
     error_msg: Optional[str] = None
+    error_file: Optional[str] = None
+    error_line: Optional[int] = None
+    error_function: Optional[str] = None
+    error_traceback: Optional[str] = None
     timestamp: float = field(default_factory=time.time)
 
     def to_json(self) -> str:

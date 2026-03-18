@@ -45,6 +45,12 @@ class TestUserModel:
         # But not admin fields
         assert "google_id" not in data
 
+    def test_private_scope_includes_terms_acceptance_timestamp(self, sample_user):
+        sample_user.terms_accepted_at = "2026-03-18T10:00:00Z"
+        data = sample_user.to_dict(Scope.PRIVATE)
+        assert "terms_accepted_at" in data
+        assert data["terms_accepted_at"] == "2026-03-18T10:00:00Z"
+
     def test_admin_scope_includes_all_fields(self, sample_user):
         data = sample_user.to_dict(Scope.ADMIN)
         assert "email" in data
@@ -168,6 +174,13 @@ class TestUsersEndpoints:
         assert "user" in data
         assert data["user"]["role"] == "AUTHOR"
         assert "email" not in data["user"]  # Private field excluded
+        assert "google_id" not in data["user"]
+
+    def test_get_public_profile_returns_404_for_missing_user(self, client):
+        response = client.get("/api/users/missing-user")
+
+        assert response.status_code == 404
+        assert response.json()["error"]["code"] == "NOT_FOUND"
 
     def test_get_authenticated_user(self, client, auth_token):
         """GET /api/users/me"""
@@ -177,8 +190,16 @@ class TestUsersEndpoints:
         assert response.status_code == 200
         data = response.json()
         assert "email" in data["user"]  # Private field included
+        assert data["user"]["terms_accepted_at"] == "2026-03-18T10:00:00Z"
+        assert "google_id" not in data["user"]
 
-    def test_update_profile(self, client, auth_token):
+    def test_get_authenticated_user_requires_auth(self, client):
+        response = client.get("/api/users/me")
+
+        assert response.status_code == 401
+        assert response.json()["error"]["code"] == "UNAUTHORISED"
+
+    def test_update_profile(self, client, auth_token, fake_env):
         """PUT /api/users/me"""
         response = client.put(
             "/api/users/me",
@@ -187,8 +208,10 @@ class TestUsersEndpoints:
         )
         assert response.status_code == 200
         assert response.json()["status"] == "updated"
+        assert fake_env.state["users"]["auth-user"].name == "Alice Brown"
+        assert fake_env.state["profile_updates"][-1]["name"] == "Alice Brown"
 
-    def test_upload_avatar(self, client, auth_token):
+    def test_upload_avatar(self, client, auth_token, fake_env):
         """POST /api/users/me/avatar"""
         image_data = b"fake image data"
         response = client.post(
@@ -202,6 +225,11 @@ class TestUsersEndpoints:
         assert response.status_code == 201
         assert "avatar_url" in response.json()
         assert "media.zenos.work" in response.json()["avatar_url"]
+        assert response.json()["key"] == "uploads/auth-user.jpg"
+        assert fake_env.state["uploads"][-1]["content_type"] == "image/jpeg"
+        assert fake_env.state["users"]["auth-user"].avatar_url.endswith(
+            "/auth-user.jpg"
+        )
 
     def test_list_users_requires_admin(self, client, auth_token_reader):
         """GET /api/users (admin only)"""
@@ -209,17 +237,22 @@ class TestUsersEndpoints:
             "/api/users", headers={"Authorization": f"Bearer {auth_token_reader}"}
         )
         assert response.status_code == 403
+        assert response.json()["error"]["code"] == "FORBIDDEN"
 
     def test_list_users_admin(self, client, auth_token_superadmin):
         """GET /api/users (superadmin)"""
         response = client.get(
-            "/api/users?page=1&limit=10",
+            "/api/users?page=1&limit=2",
             headers={"Authorization": f"Bearer {auth_token_superadmin}"},
         )
         assert response.status_code == 200
         data = response.json()
         assert "data" in data
         assert "pagination" in data
+        assert data["pagination"]["page"] == 1
+        assert data["pagination"]["limit"] == 2
+        assert data["pagination"]["total"] >= len(data["data"])
+        assert data["pagination"]["pages"] >= 1
 
     def test_ban_user_requires_superadmin(self, client, auth_token_approver):
         """PUT /api/users/:id/ban (superadmin only)"""
@@ -228,11 +261,49 @@ class TestUsersEndpoints:
             headers={"Authorization": f"Bearer {auth_token_approver}"},
         )
         assert response.status_code == 403
+        assert response.json()["error"]["code"] == "FORBIDDEN"
 
-    def test_ban_user_superadmin(self, client, auth_token_superadmin):
+    def test_ban_user_superadmin(self, client, auth_token_superadmin, fake_env):
         """PUT /api/users/:id/ban"""
         response = client.put(
             "/api/users/user-123/ban",
             headers={"Authorization": f"Bearer {auth_token_superadmin}"},
         )
         assert response.status_code == 200
+        assert response.json()["is_active"] is False
+        assert fake_env.state["users"]["user-123"].is_active == 0
+
+    def test_accept_terms_returns_existing_timestamp(
+        self, client, auth_token, fake_env
+    ):
+        response = client.put(
+            "/api/users/me/accept-terms",
+            headers={"Authorization": f"Bearer {auth_token}"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["terms_accepted"] is True
+        assert (
+            data["terms_accepted_at"]
+            == fake_env.state["users"]["auth-user"].terms_accepted_at
+        )
+
+    def test_accept_terms_sets_timestamp_when_missing(
+        self, client, auth_token_reader, fake_env
+    ):
+        fake_env.state["users"]["reader-user"].terms_accepted_at = None
+
+        response = client.put(
+            "/api/users/me/accept-terms",
+            headers={"Authorization": f"Bearer {auth_token_reader}"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["terms_accepted"] is True
+        assert data["terms_accepted_at"] == "2026-03-18T12:00:00Z"
+        assert (
+            fake_env.state["users"]["reader-user"].terms_accepted_at
+            == "2026-03-18T12:00:00Z"
+        )

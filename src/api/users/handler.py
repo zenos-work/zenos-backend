@@ -118,6 +118,8 @@ async def handle_users(request, env, path, method, query, ctx):
             )
         except ValueError as e:
             return error(str(e), 422)
+        except RuntimeError as e:
+            return error(str(e), 503)
         return json_resp(
             {
                 "avatar_url": result["url"],

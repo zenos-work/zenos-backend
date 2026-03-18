@@ -1,7 +1,7 @@
 from workers import WorkerEntrypoint
 from urllib.parse import urlparse, parse_qs
 from middleware.logging import with_logging
-from utils.helpers import json_resp
+from utils.helpers import json_resp, cors_headers
 from auth.router import handle_auth
 
 # Import all API handlers (add as you build each module)
@@ -13,8 +13,9 @@ from api.social.handler import handle_social
 from api.feed.handler import handle_feed
 from api.media.handler import handle_media
 from api.admin.handler import handle_admin
+from api.search.handler import handle_search
 
-from js import Response, Headers
+from js import Response
 
 
 class Default(WorkerEntrypoint):
@@ -31,18 +32,16 @@ class Default(WorkerEntrypoint):
         query = parse_qs(url.query)
 
         if method == "OPTIONS":
-            headers = Headers.new(
-                [
-                    ("Access-Control-Allow-Origin", "http://localhost:5173"),
-                    (
-                        "Access-Control-Allow-Methods",
-                        "GET, POST, PUT, DELETE, OPTIONS, PATCH",
-                    ),
-                    ("Access-Control-Allow-Headers", "Content-Type, Authorization"),
-                    ("Access-Control-Allow-Credentials", "true"),
-                ]
+            return Response.new(
+                None,
+                status=204,
+                headers=cors_headers(
+                    env=env,
+                    request=request,
+                    content_type=None,
+                    allow_credentials=True,
+                ),
             )
-            return Response.new(None, status=204, headers=headers)
 
         if path == "/health":
             return json_resp(
@@ -51,7 +50,9 @@ class Default(WorkerEntrypoint):
                     "service": "zenos-api",
                     "env": env.ENVIRONMENT,
                     "trace_id": ctx.trace_id,
-                }
+                },
+                env=env,
+                request=request,
             )
 
         if path.startswith("/auth/"):
@@ -74,4 +75,7 @@ class Default(WorkerEntrypoint):
         if path.startswith("/api/admin"):
             return await handle_admin(request, env, path, method, query, ctx)
 
-        return json_resp({"error": "Not found"}, 404)
+        if path.startswith("/api/search"):
+            return await handle_search(request, env, path, method, query, ctx)
+
+        return json_resp({"error": "Not found"}, 404, env=env, request=request)
