@@ -1,5 +1,5 @@
 {
-  "name": "zenos-api",
+  "name": "zenos-api-staging",
   "main": "src/index.py",
   "compatibility_date": "2024-12-01",
   "compatibility_flags": ["python_workers"],
