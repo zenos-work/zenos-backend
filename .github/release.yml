@@ -1,0 +1,45 @@
+changelog:
+  exclude:
+    labels:
+      - skip-changelog
+      - duplicate
+      - invalid
+      - question
+      - wontfix
+  categories:
+    - title: "Breaking Changes"
+      labels:
+        - breaking-change
+        - semver-major
+    - title: "Security"
+      labels:
+        - security
+        - vuln
+        - dependencies
+    - title: "Features"
+      labels:
+        - feature
+        - enhancement
+        - feat
+    - title: "Fixes"
+      labels:
+        - bug
+        - bugfix
+        - fix
+    - title: "Performance"
+      labels:
+        - performance
+        - perf
+    - title: "Documentation"
+      labels:
+        - documentation
+        - docs
+    - title: "Maintenance"
+      labels:
+        - chore
+        - refactor
+        - ci
+        - test
+    - title: "Other Changes"
+      labels:
+        - "*"

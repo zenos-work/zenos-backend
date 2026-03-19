@@ -141,8 +141,12 @@ celerybeat.pid
 
 # Environments
 .env
+.env.local
+.env.*
+!.env.example
 .envrc
 .venv
+.venv-workers
 env/
 venv/
 ENV/
@@ -195,6 +199,11 @@ cython_debug/
 
 # Ruff stuff:
 .ruff_cache/
+.wrangler/
+coverage.json
+bandit-report.json
+pip-audit-report.json
+*.sarif
 
 # PyPI configuration file
 .pypirc
