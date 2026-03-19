@@ -1,32 +1,5 @@
 import pytest
-import sys
-import types
 import importlib
-from pathlib import Path
-
-
-ROOT = Path(__file__).resolve().parents[1]
-SRC = ROOT / "src"
-if str(SRC) not in sys.path:
-    sys.path.insert(0, str(SRC))
-
-
-if "js" not in sys.modules:
-    js_stub = types.ModuleType("js")
-
-    class _Headers:
-        @staticmethod
-        def new(*args, **kwargs):
-            return None
-
-    class _Response:
-        @staticmethod
-        def new(*args, **kwargs):
-            return None
-
-    js_stub.Headers = _Headers
-    js_stub.Response = _Response
-    sys.modules["js"] = js_stub
 
 FeedService = importlib.import_module("api.feed.service").FeedService
 
