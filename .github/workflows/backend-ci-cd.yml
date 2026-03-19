@@ -1,11 +1,9 @@
 name: Backend CI/CD
 
 on:
-  push:
-    branches:
-      - development
   pull_request:
     branches:
+      - development
       - staging
       - master
     types:
@@ -24,9 +22,22 @@ permissions:
 jobs:
   call-reusable-workflow:
     name: Backend CI/Deploy
+    # Only run CI for PRs that follow the permitted promotion flow:
+    #   development → staging  (CI + deploy on merge)
+    #   master      → staging  (CI only, backmerge — no deploy)
+    #   staging     → master   (CI + deploy on merge)
+     #   staging     → development (CI only, backmerge — no deploy)
+     #   master      → development (CI only, backmerge — no deploy)
+    if: |
+      (github.event.pull_request.base.ref == 'development' &&
+       (github.event.pull_request.head.ref == 'staging' || github.event.pull_request.head.ref == 'master')) ||
+      (github.event.pull_request.base.ref == 'staging' &&
+       (github.event.pull_request.head.ref == 'development' || github.event.pull_request.head.ref == 'master')) ||
+      (github.event.pull_request.base.ref == 'master' &&
+       github.event.pull_request.head.ref == 'staging')
     uses: zenos-work/zenos-infra/.github/workflows/backend-ci-deploy.yml@development
     with:
-      environment: ${{ (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged && github.event.pull_request.base.ref == 'staging' && github.event.pull_request.head.ref == 'development') && 'staging' || (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged && github.event.pull_request.base.ref == 'master' && github.event.pull_request.head.ref == 'staging') && 'production' || 'staging' }}
-      run_deploy: ${{ (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged && (github.event.pull_request.base.ref == 'staging' || github.event.pull_request.base.ref == 'master')) }}
+      environment: ${{ (github.event.action == 'closed' && github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'staging' && github.event.pull_request.head.ref == 'development') && 'staging' || (github.event.action == 'closed' && github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'master' && github.event.pull_request.head.ref == 'staging') && 'production' || 'staging' }}
+      run_deploy: ${{ github.event.action == 'closed' && github.event.pull_request.merged == true && ((github.event.pull_request.base.ref == 'staging' && github.event.pull_request.head.ref == 'development') || (github.event.pull_request.base.ref == 'master' && github.event.pull_request.head.ref == 'staging')) }}
       min_coverage: ${{ vars.BACKEND_MIN_COVERAGE || '80' }}
     secrets: inherit
