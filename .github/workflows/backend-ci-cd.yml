@@ -18,6 +18,9 @@ concurrency:
   group: backend-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: write
+
 jobs:
   call-reusable-workflow:
     name: Backend CI/Deploy
