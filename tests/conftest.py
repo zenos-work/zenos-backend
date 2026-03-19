@@ -50,6 +50,34 @@ if "js" not in sys.modules:
     sys.modules["js"] = js_stub
 
 
+@pytest.fixture(autouse=True)
+def ensure_js_fetch_stub():
+    """Ensure modules that import `from js import fetch` are import-safe in tests."""
+    js_mod = sys.modules["js"]
+    if not hasattr(js_mod, "fetch"):
+        js_mod.fetch = None
+
+
+@pytest.fixture
+def simple_request_factory():
+    class SimpleRequest:
+        def __init__(self, method="GET", url="https://test.local/", headers=None):
+            self.method = method
+            self.url = url
+            self.headers = headers or {}
+
+    return SimpleRequest
+
+
+@pytest.fixture
+def development_env():
+    class DevelopmentEnv:
+        ENVIRONMENT = "development"
+        FRONTEND_URL = "https://app.zenos.dev/path"
+
+    return DevelopmentEnv()
+
+
 User = importlib.import_module("models.user.model").User
 create_token = importlib.import_module("auth.jwt_handler").create_token
 users_handler = importlib.import_module("api.users.handler")

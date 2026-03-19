@@ -11,54 +11,9 @@ Covers:
 
 import asyncio
 import importlib
-import sys
-import types
-from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 import pytest
-
-ROOT = Path(__file__).resolve().parents[1]
-SRC = ROOT / "src"
-if str(SRC) not in sys.path:
-    sys.path.insert(0, str(SRC))
-
-# ── JS stub (mirrors conftest) ────────────────────────────────────────────────
-if "js" not in sys.modules:
-    import json
-
-    js_stub = types.ModuleType("js")
-
-    class _Headers:
-        @staticmethod
-        def new(values=None, **_kwargs):
-            if values is None:
-                return {}
-            if isinstance(values, dict):
-                return values
-            return {key: value for key, value in values}
-
-    class _ResponseInstance:
-        def __init__(self, body=None, status=200, headers=None):
-            self.status_code = status
-            self.headers = headers or {}
-            self._body = body
-
-        def json(self):
-            if self._body is None or self._body == "":
-                return None
-            if isinstance(self._body, (dict, list)):
-                return self._body
-            return json.loads(self._body)
-
-    class _Response:
-        @staticmethod
-        def new(body=None, status=200, headers=None):
-            return _ResponseInstance(body=body, status=status, headers=headers)
-
-    js_stub.Headers = _Headers
-    js_stub.Response = _Response
-    sys.modules["js"] = js_stub
 
 ArticleCreateRequest = importlib.import_module(
     "models.article.requests"
