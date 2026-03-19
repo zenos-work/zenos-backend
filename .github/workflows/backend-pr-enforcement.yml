@@ -1,0 +1,24 @@
+name: Backend PR Branch Enforcement
+
+on:
+  pull_request:
+    branches:
+      - development
+      - staging
+      - master
+    types:
+      - opened
+      - reopened
+
+permissions:
+  pull-requests: write
+  issues: write
+
+jobs:
+  call-enforcement:
+    name: Enforce Branch Policy
+    uses: zenos-work/zenos-infra/.github/workflows/pr-enforcement.yml@development
+    # allowed_head_for_development defaults to "staging,master"
+    # allowed_head_for_staging    defaults to "development,master"
+    # allowed_head_for_master     defaults to "staging"
+    secrets: inherit
