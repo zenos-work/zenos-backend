@@ -1,5 +1,4 @@
 # Zenos Backend
-
 This repository contains the Cloudflare Workers–based backend for the Zenos
 platform written in Python. It provides:
 
