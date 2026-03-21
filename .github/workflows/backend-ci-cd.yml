@@ -1,16 +1,11 @@
 name: Backend CI/CD
 
 on:
-  pull_request:
+  push:
     branches:
       - development
       - staging
       - master
-    types:
-      - opened
-      - synchronize
-      - reopened
-      - closed
 
 concurrency:
   group: backend-${{ github.workflow }}-${{ github.ref }}
@@ -22,36 +17,23 @@ permissions:
 jobs:
   call-reusable-workflow:
     name: Backend CI/Deploy
-    # Only run CI for PRs that follow the permitted promotion flow:
-    #   development → staging  (CI + deploy on merge)
-    #   master      → staging  (CI only, backmerge — no deploy)
-    #   staging     → master   (CI + deploy on merge)
-     #   staging     → development (CI only, backmerge — no deploy)
-     #   master      → development (CI only, backmerge — no deploy)
-    if: |
-      (github.event.pull_request.base.ref == 'development' &&
-       (github.event.pull_request.head.ref == 'staging' || github.event.pull_request.head.ref == 'master')) ||
-      (github.event.pull_request.base.ref == 'staging' &&
-       (github.event.pull_request.head.ref == 'development' || github.event.pull_request.head.ref == 'master')) ||
-      (github.event.pull_request.base.ref == 'master' &&
-       github.event.pull_request.head.ref == 'staging')
+    # Runs on push to any promotion branch.
+    # Deploy only happens when merging promotion PRs (development→staging, staging→master)
     uses: zenos-work/zenos-infra/.github/workflows/backend-ci-deploy.yml@development
     with:
-      environment: ${{ (github.event.action == 'closed' && github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'staging' && github.event.pull_request.head.ref == 'development') && 'staging' || (github.event.action == 'closed' && github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'master' && github.event.pull_request.head.ref == 'staging') && 'production' || 'staging' }}
-      run_deploy: ${{ github.event.action == 'closed' && github.event.pull_request.merged == true && ((github.event.pull_request.base.ref == 'staging' && github.event.pull_request.head.ref == 'development') || (github.event.pull_request.base.ref == 'master' && github.event.pull_request.head.ref == 'staging')) }}
+      # Set environment based on target branch after merge
+      environment: ${{ github.ref == 'refs/heads/staging' && 'staging' || github.ref == 'refs/heads/master' && 'production' || 'staging' }}
+      run_deploy: ${{ github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/master' }}
       min_coverage: ${{ vars.BACKEND_MIN_COVERAGE || '80' }}
     secrets: inherit
 
   smoke-test:
     name: Backend Smoke Test
     needs: call-reusable-workflow
-    if: |
-      github.event.action == 'closed' &&
-      github.event.pull_request.merged == true &&
-      ((github.event.pull_request.base.ref == 'staging' && github.event.pull_request.head.ref == 'development') ||
-       (github.event.pull_request.base.ref == 'master' && github.event.pull_request.head.ref == 'staging'))
+    # Only run smoke test after successful push to staging or master (merged promotion PRs)
+    if: success() && (github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/master')
     runs-on: ubuntu-latest
-    environment: ${{ (github.event.pull_request.base.ref == 'staging' && github.event.pull_request.head.ref == 'development') && 'staging' || 'production' }}
+    environment: ${{ github.ref == 'refs/heads/staging' && 'staging' || 'production' }}
 
     steps:
       - name: Checkout
@@ -62,6 +44,6 @@ jobs:
           chmod +x ./scripts/smoke_test.sh
           ./scripts/smoke_test.sh
         env:
-          SMOKE_ENV: ${{ (github.event.pull_request.base.ref == 'staging' && github.event.pull_request.head.ref == 'development') && 'staging' || 'production' }}
+          SMOKE_ENV: ${{ github.ref == 'refs/heads/staging' && 'staging' || 'production' }}
           API_BASE_URL: ${{ (github.event.pull_request.base.ref == 'staging' && github.event.pull_request.head.ref == 'development') && 'https://staging.api.zenos.work' || 'https://api.zenos.work' }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
