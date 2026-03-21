@@ -252,6 +252,10 @@ class TestArticleRepository:
 
         assert inserted.id == "a1"
         assert updated.id == "a1"
+        assert executed[0][1][4] == ""
+        assert executed[0][1][6] == ""
+        assert executed[1][1][2] == ""
+        assert executed[1][1][3] == ""
 
         await repo.set_status("a1", "APPROVED", approved_by="approver")
         await repo.set_status("a1", "REJECTED", rejection_note="bad")

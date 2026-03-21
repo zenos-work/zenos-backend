@@ -1,4 +1,12 @@
+import inspect
 from typing import Optional, Any
+
+try:
+    from js import JSON as js_JSON
+
+    js_null = js_JSON.parse("null")
+except ImportError:  # pragma: no cover - local test environment
+    js_null = None
 
 
 class D1Executor:
@@ -16,17 +24,30 @@ class D1Executor:
         self._db = db
         self._ctx = ctx
 
+    def _null_value(self):
+        return js_null if js_null is not None else None
+
+    @staticmethod
+    def _is_null_like_string(value: str) -> bool:
+        lowered = value.strip().lower()
+        return lowered in {
+            "undefined",
+            "null",
+            "[object undefined]",
+            "[object null]",
+        }
+
     def _normalize_param(self, value: Any) -> Any:
         if value is None:
-            return None
+            return self._null_value()
 
         # Fast-path for JS undefined/null objects exposed by Python Workers.
         # These may not be Python strings, but their string representation is
         # often "undefined"/"null" and D1 bind rejects them.
         try:
             rendered = str(value).strip().lower()
-            if rendered in {"undefined", "null"}:
-                return None
+            if self._is_null_like_string(rendered):
+                return self._null_value()
         except Exception:
             pass
 
@@ -39,21 +60,28 @@ class D1Executor:
                 value = to_py(depth=5)
 
         if value is None:
-            return None
+            return self._null_value()
 
         if isinstance(value, str):
-            lowered = value.strip().lower()
-            if lowered in {"undefined", "null"}:
-                return None
+            if self._is_null_like_string(value):
+                return self._null_value()
 
         try:
             rendered = str(value).strip().lower()
-            if rendered in {"undefined", "null"}:
-                return None
+            if self._is_null_like_string(rendered):
+                return self._null_value()
         except Exception:
             pass
 
-        return value
+        primitive_types = (str, int, float, bool, bytes, bytearray, memoryview)
+        if isinstance(value, primitive_types):
+            return value
+
+        # Last-resort guard: prevent JS proxy-like objects from reaching D1 bind.
+        try:
+            return str(value)
+        except Exception:
+            return self._null_value()
 
     def _normalize_params(self, params: tuple) -> tuple:
         return tuple(self._normalize_param(p) for p in params)
@@ -89,7 +117,9 @@ class D1Executor:
 
     async def _log(self, sql: str, params: tuple) -> None:
         if self._ctx:
-            self._ctx.log.debug(
+            result = self._ctx.log.debug(
                 "db.query",
                 event_data={"sql": sql[:120], "params": list(params)},
             )
+            if inspect.isawaitable(result):
+                await result

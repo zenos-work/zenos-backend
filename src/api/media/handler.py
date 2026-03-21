@@ -5,6 +5,39 @@ from middleware.auth import get_user, require_role
 from api.media.service import MediaService
 
 
+def _extract_content_type(obj):
+    metadata = getattr(obj, "httpMetadata", None)
+    if not metadata:
+        return None
+
+    getter = getattr(metadata, "get", None)
+    if callable(getter):
+        try:
+            content_type = getter("contentType")
+            if content_type:
+                return str(content_type)
+        except Exception:
+            pass
+
+    content_type = getattr(metadata, "contentType", None)
+    if content_type:
+        return str(content_type)
+
+    to_py = getattr(metadata, "to_py", None)
+    if callable(to_py):
+        try:
+            metadata = to_py()
+        except TypeError:
+            metadata = to_py(depth=3)
+
+    if isinstance(metadata, dict):
+        content_type = metadata.get("contentType")
+        if content_type:
+            return str(content_type)
+
+    return None
+
+
 async def handle_media(request, env, path, method, query, ctx):
     svc = MediaService(env, ctx)
     parts = path.rstrip("/").split("/")
@@ -20,9 +53,7 @@ async def handle_media(request, env, path, method, query, ctx):
         if not obj:
             return error("Media not found", 404)
 
-        content_type = None
-        if getattr(obj, "httpMetadata", None):
-            content_type = obj.httpMetadata.get("contentType")
+        content_type = _extract_content_type(obj)
         if not content_type:
             content_type = "application/octet-stream"
 

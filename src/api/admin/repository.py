@@ -75,11 +75,17 @@ class AdminRepository(BaseRepository):
         return self.map_many(rows, Article)
 
     async def find_approval_queue(self, limit: int, offset: int) -> list:
-        rows = await self.find_all(Q.SELECT_APPROVAL_QUEUE, "SUBMITTED", limit, offset)
+        rows = await self.find_all(
+            Q.SELECT_APPROVAL_QUEUE,
+            "SUBMITTED",
+            "APPROVED",
+            limit,
+            offset,
+        )
         return self.map_many(rows, Article)
 
     async def count_approval_queue(self) -> int:
-        row = await self.find_one(Q.COUNT_APPROVAL_QUEUE, "SUBMITTED")
+        row = await self.find_one(Q.COUNT_APPROVAL_QUEUE, "SUBMITTED", "APPROVED")
         return row_get(row, "c", 0)
 
     async def find_all_users(self, limit: int, offset: int) -> list:
