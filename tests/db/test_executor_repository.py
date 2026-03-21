@@ -1,4 +1,5 @@
 import pytest
+import db.executor as executor_module
 
 from db.executor import D1Executor
 from db.repository import BaseRepository
@@ -51,6 +52,18 @@ class _Ctx:
             self.calls = []
 
         def debug(self, name, event_data=None):
+            self.calls.append((name, event_data))
+
+    def __init__(self):
+        self.log = self._Log()
+
+
+class _AsyncCtx:
+    class _Log:
+        def __init__(self):
+            self.calls = []
+
+        async def debug(self, name, event_data=None):
             self.calls.append((name, event_data))
 
     def __init__(self):
@@ -121,6 +134,63 @@ class TestD1Executor:
         await ex.run("UPDATE x SET a=?", UndefinedLike())
 
         assert state["bound"][-1] == (None,)
+
+    @pytest.mark.asyncio
+    async def test_executor_prefers_js_null_for_null_like_values(self, monkeypatch):
+        class UndefinedLike:
+            def __str__(self) -> str:
+                return "undefined"
+
+        sentinel_null = object()
+        monkeypatch.setattr(executor_module, "js_null", sentinel_null)
+
+        state = {
+            "queries": [],
+            "bound": [],
+            "run_calls": 0,
+            "first_result": None,
+            "all_result": None,
+        }
+        ex = D1Executor(_DB(state), _Ctx())
+
+        await ex.run("UPDATE x SET a=?, b=?", UndefinedLike(), "null")
+
+        assert state["bound"][-1] == (sentinel_null, sentinel_null)
+
+    @pytest.mark.asyncio
+    async def test_executor_normalizes_object_undefined_shape(self):
+        class UndefinedObjectLike:
+            def __str__(self) -> str:
+                return "[object Undefined]"
+
+        state = {
+            "queries": [],
+            "bound": [],
+            "run_calls": 0,
+            "first_result": None,
+            "all_result": None,
+        }
+        ex = D1Executor(_DB(state), _Ctx())
+
+        await ex.run("UPDATE x SET a=?", UndefinedObjectLike())
+
+        assert state["bound"][-1] == (None,)
+
+    @pytest.mark.asyncio
+    async def test_executor_awaits_async_debug_logger(self):
+        state = {
+            "queries": [],
+            "bound": [],
+            "run_calls": 0,
+            "first_result": None,
+            "all_result": None,
+        }
+        ctx = _AsyncCtx()
+        ex = D1Executor(_DB(state), ctx)
+
+        await ex.run("UPDATE x SET a=?", 1)
+
+        assert len(ctx.log.calls) == 1
 
     @pytest.mark.asyncio
     async def test_exceptions_are_reraised(self):

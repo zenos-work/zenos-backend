@@ -101,6 +101,13 @@ class ArticleRepository(BaseRepository):
 
     # ── Write ─────────────────────────────────────────────
 
+    @staticmethod
+    def _optional_text(value: Optional[str]) -> str:
+        if value is None:
+            return ""
+        text = str(value).strip()
+        return text
+
     async def insert(
         self,
         aid: str,
@@ -119,9 +126,9 @@ class ArticleRepository(BaseRepository):
             author_id,
             title,
             slug,
-            subtitle,
+            self._optional_text(subtitle),
             content,
-            cover_image_url,
+            self._optional_text(cover_image_url),
             read_time,
             status,
         )
@@ -143,8 +150,8 @@ class ArticleRepository(BaseRepository):
             Q.UPDATE_ARTICLE,
             title,
             content,
-            subtitle,
-            cover_image_url,
+            self._optional_text(subtitle),
+            self._optional_text(cover_image_url),
             read_time,
             article_id,
         )

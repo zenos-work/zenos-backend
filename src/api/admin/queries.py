@@ -51,11 +51,11 @@ SELECT_TOP_ARTICLES = (
 SELECT_APPROVAL_QUEUE = (
     "SELECT a.*, u.name AS author_name"
     " FROM articles a JOIN users u ON a.author_id = u.id"
-    " WHERE a.status = ?"
+    " WHERE a.status IN (?, ?)"
     " ORDER BY a.updated_at ASC LIMIT ? OFFSET ?"
 )
 
-COUNT_APPROVAL_QUEUE = "SELECT COUNT(*) AS c FROM articles WHERE status = ?"
+COUNT_APPROVAL_QUEUE = "SELECT COUNT(*) AS c FROM articles WHERE status IN (?, ?)"
 
 SELECT_ALL_USERS_ADMIN = (
     "SELECT id, email, name, role, is_active, created_at"
