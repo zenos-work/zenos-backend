@@ -12,6 +12,10 @@
 #
 # Required env var for authenticated tests:
 #   JWT_SECRET  — must match the Cloudflare Worker secret for the target env
+#
+# Optional env vars for Cloudflare Access protected domains:
+#   CF_ACCESS_CLIENT_ID
+#   CF_ACCESS_CLIENT_SECRET
 # =============================================================================
 
 set -euo pipefail
@@ -41,6 +45,18 @@ PASS=0
 FAIL=0
 SKIP=0
 
+CURL_COMMON_ARGS=(
+  -H "Accept: application/json"
+  -H "User-Agent: zenos-smoke-test/1.0"
+)
+
+if [[ -n "${CF_ACCESS_CLIENT_ID:-}" && -n "${CF_ACCESS_CLIENT_SECRET:-}" ]]; then
+  CURL_COMMON_ARGS+=(
+    -H "CF-Access-Client-Id: ${CF_ACCESS_CLIENT_ID}"
+    -H "CF-Access-Client-Secret: ${CF_ACCESS_CLIENT_SECRET}"
+  )
+fi
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -58,14 +74,25 @@ header() { echo -e "\n── $1 ────────────────
 http_status() {
   local method="$1" url="$2"
   shift 2
-  curl -s -o /dev/null -w "%{http_code}" -X "$method" "$url" "$@"
+  curl -s -o /dev/null -w "%{http_code}" -X "$method" "$url" "${CURL_COMMON_ARGS[@]}" "$@"
 }
 
 # Return first 200 chars of response body (for assertion on content)
 http_body() {
   local method="$1" url="$2"
   shift 2
-  curl -s -X "$method" "$url" "$@" | head -c 500
+  curl -s -X "$method" "$url" "${CURL_COMMON_ARGS[@]}" "$@" | head -c 500
+}
+
+print_edge_access_hint() {
+  local path="$1"
+  local body
+  body=$(http_body GET "$BASE_URL$path")
+  echo "  INFO  Received 403 from $path. This usually indicates Cloudflare edge protection (Access/WAF), not app logic."
+  if [[ -z "${CF_ACCESS_CLIENT_ID:-}" || -z "${CF_ACCESS_CLIENT_SECRET:-}" ]]; then
+    echo "  INFO  Set CF_ACCESS_CLIENT_ID and CF_ACCESS_CLIENT_SECRET in GitHub environment secrets for $SMOKE_ENV."
+  fi
+  echo "  INFO  Response snippet: ${body:0:180}"
 }
 
 # ---------------------------------------------------------------------------
@@ -102,6 +129,9 @@ if [[ "$STATUS" == "200" ]]; then
   pass "GET /health → 200"
 else
   fail "GET /health" "expected 200, got $STATUS"
+  if [[ "$STATUS" == "403" ]]; then
+    print_edge_access_hint "/health"
+  fi
 fi
 
 # 2. Auth login redirect (should 302 to Google)

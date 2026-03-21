@@ -75,5 +75,7 @@ jobs:
           ./scripts/smoke_test.sh
         env:
           SMOKE_ENV: ${{ needs.resolve-context.outputs.environment }}
-          API_BASE_URL: ${{ vars.API_BASE_URL }}
+          API_BASE_URL: ${{ vars.SMOKE_API_BASE_URL || vars.API_BASE_URL }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
