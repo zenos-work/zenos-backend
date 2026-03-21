@@ -3,6 +3,16 @@ from typing import Optional, List
 from models.base import BaseRequest
 
 
+def _normalize_optional_text(value) -> Optional[str]:
+    if value is None:
+        return None
+
+    text = str(value).strip()
+    if not text or text.lower() == "undefined" or text.lower() == "null":
+        return None
+    return text
+
+
 @dataclass
 class ArticleCreateRequest(BaseRequest):
     """Create a new article (DRAFT status by default)."""
@@ -33,11 +43,12 @@ class ArticleCreateRequest(BaseRequest):
         if len(content) > 50000:
             raise ValueError("Content cannot exceed 50,000 characters")
 
-        subtitle = data.get("subtitle")
+        subtitle = _normalize_optional_text(data.get("subtitle"))
         if subtitle:
-            subtitle = str(subtitle).strip()
             if len(subtitle) > 500:
                 raise ValueError("Subtitle cannot be longer than 500 characters")
+
+        cover_image_url = _normalize_optional_text(data.get("cover_image_url"))
 
         tag_ids = data.get("tag_ids", [])
         if not isinstance(tag_ids, list):
@@ -49,7 +60,7 @@ class ArticleCreateRequest(BaseRequest):
             title=title,
             content=content,
             subtitle=subtitle if subtitle else None,
-            cover_image_url=data.get("cover_image_url"),
+            cover_image_url=cover_image_url,
             tag_ids=tag_ids,
         )
 
@@ -83,11 +94,12 @@ class ArticleUpdateRequest(BaseRequest):
             if len(content) > 50000:
                 raise ValueError("Content cannot exceed 50,000 characters")
 
-        subtitle = data.get("subtitle")
+        subtitle = _normalize_optional_text(data.get("subtitle"))
         if subtitle is not None:
-            subtitle = str(subtitle).strip()
             if len(subtitle) > 500:
                 raise ValueError("Subtitle cannot be longer than 500 characters")
+
+        cover_image_url = _normalize_optional_text(data.get("cover_image_url"))
 
         tag_ids = data.get("tag_ids")
         if tag_ids is not None:
@@ -100,7 +112,7 @@ class ArticleUpdateRequest(BaseRequest):
             title=title,
             content=content,
             subtitle=subtitle,
-            cover_image_url=data.get("cover_image_url"),
+            cover_image_url=cover_image_url,
             tag_ids=tag_ids,
         )
 
