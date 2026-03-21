@@ -15,25 +15,55 @@ permissions:
   contents: write
 
 jobs:
+  resolve-context:
+    name: Resolve Branch Context
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.resolve.outputs.environment }}
+      run_deploy: ${{ steps.resolve.outputs.run_deploy }}
+
+    steps:
+      - name: Resolve environment and deploy flag
+        id: resolve
+        run: |
+          branch="${GITHUB_REF#refs/heads/}"
+
+          case "$branch" in
+            staging)
+              environment="staging"
+              run_deploy="true"
+              ;;
+            master)
+              environment="production"
+              run_deploy="true"
+              ;;
+            *)
+              environment="staging"
+              run_deploy="false"
+              ;;
+          esac
+
+          echo "environment=${environment}" >> "$GITHUB_OUTPUT"
+          echo "run_deploy=${run_deploy}" >> "$GITHUB_OUTPUT"
+
   call-reusable-workflow:
     name: Backend CI/Deploy
-    # Runs on push to any promotion branch.
-    # Deploy only happens when merging promotion PRs (development→staging, staging→master)
+    needs: resolve-context
     uses: zenos-work/zenos-infra/.github/workflows/backend-ci-deploy.yml@development
     with:
-      # Set environment based on target branch after merge
-      environment: ${{ github.ref == 'refs/heads/staging' && 'staging' || github.ref == 'refs/heads/master' && 'production' || 'staging' }}
-      run_deploy: ${{ github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/master' }}
+      environment: ${{ needs.resolve-context.outputs.environment }}
+      run_deploy: ${{ needs.resolve-context.outputs.run_deploy == 'true' }}
       min_coverage: ${{ vars.BACKEND_MIN_COVERAGE || '80' }}
     secrets: inherit
 
   smoke-test:
     name: Backend Smoke Test
-    needs: call-reusable-workflow
-    # Only run smoke test after successful push to staging or master (merged promotion PRs)
-    if: success() && (github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/master')
+    needs:
+      - resolve-context
+      - call-reusable-workflow
+    if: success() && needs.resolve-context.outputs.run_deploy == 'true'
     runs-on: ubuntu-latest
-    environment: ${{ github.ref == 'refs/heads/staging' && 'staging' || 'production' }}
+    environment: ${{ needs.resolve-context.outputs.environment }}
 
     steps:
       - name: Checkout
@@ -44,6 +74,6 @@ jobs:
           chmod +x ./scripts/smoke_test.sh
           ./scripts/smoke_test.sh
         env:
-          SMOKE_ENV: ${{ github.ref == 'refs/heads/staging' && 'staging' || 'production' }}
-          API_BASE_URL: ${{ (github.event.pull_request.base.ref == 'staging' && github.event.pull_request.head.ref == 'development') && 'https://staging.api.zenos.work' || 'https://api.zenos.work' }}
+          SMOKE_ENV: ${{ needs.resolve-context.outputs.environment }}
+          API_BASE_URL: ${{ vars.API_BASE_URL }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
