@@ -104,6 +104,25 @@ class TestD1Executor:
         assert all_rows == []
 
     @pytest.mark.asyncio
+    async def test_executor_normalizes_undefined_like_object_to_none(self):
+        class UndefinedLike:
+            def __str__(self) -> str:
+                return "undefined"
+
+        state = {
+            "queries": [],
+            "bound": [],
+            "run_calls": 0,
+            "first_result": None,
+            "all_result": None,
+        }
+        ex = D1Executor(_DB(state), _Ctx())
+
+        await ex.run("UPDATE x SET a=?", UndefinedLike())
+
+        assert state["bound"][-1] == (None,)
+
+    @pytest.mark.asyncio
     async def test_exceptions_are_reraised(self):
         state = {
             "queries": [],
