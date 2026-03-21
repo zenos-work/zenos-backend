@@ -41,3 +41,27 @@ jobs:
       run_deploy: ${{ github.event.action == 'closed' && github.event.pull_request.merged == true && ((github.event.pull_request.base.ref == 'staging' && github.event.pull_request.head.ref == 'development') || (github.event.pull_request.base.ref == 'master' && github.event.pull_request.head.ref == 'staging')) }}
       min_coverage: ${{ vars.BACKEND_MIN_COVERAGE || '80' }}
     secrets: inherit
+
+  smoke-test:
+    name: Backend Smoke Test
+    needs: call-reusable-workflow
+    if: |
+      github.event.action == 'closed' &&
+      github.event.pull_request.merged == true &&
+      ((github.event.pull_request.base.ref == 'staging' && github.event.pull_request.head.ref == 'development') ||
+       (github.event.pull_request.base.ref == 'master' && github.event.pull_request.head.ref == 'staging'))
+    runs-on: ubuntu-latest
+    environment: ${{ (github.event.pull_request.base.ref == 'staging' && github.event.pull_request.head.ref == 'development') && 'staging' || 'production' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run backend smoke test
+        run: |
+          chmod +x ./scripts/smoke_test.sh
+          ./scripts/smoke_test.sh
+        env:
+          SMOKE_ENV: ${{ (github.event.pull_request.base.ref == 'staging' && github.event.pull_request.head.ref == 'development') && 'staging' || 'production' }}
+          API_BASE_URL: ${{ (github.event.pull_request.base.ref == 'staging' && github.event.pull_request.head.ref == 'development') && 'https://staging.api.zenos.work' || 'https://api.zenos.work' }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
