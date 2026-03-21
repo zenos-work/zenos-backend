@@ -20,6 +20,16 @@ class D1Executor:
         if value is None:
             return None
 
+        # Fast-path for JS undefined/null objects exposed by Python Workers.
+        # These may not be Python strings, but their string representation is
+        # often "undefined"/"null" and D1 bind rejects them.
+        try:
+            rendered = str(value).strip().lower()
+            if rendered in {"undefined", "null"}:
+                return None
+        except Exception:
+            pass
+
         # In Python Workers, optional fields may arrive as JS `undefined` proxies.
         to_py = getattr(value, "to_py", None)
         if callable(to_py):
@@ -35,6 +45,13 @@ class D1Executor:
             lowered = value.strip().lower()
             if lowered in {"undefined", "null"}:
                 return None
+
+        try:
+            rendered = str(value).strip().lower()
+            if rendered in {"undefined", "null"}:
+                return None
+        except Exception:
+            pass
 
         return value
 
