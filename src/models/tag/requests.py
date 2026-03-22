@@ -11,8 +11,8 @@ class TagCreateRequest(BaseRequest):
         if "name" not in data or not isinstance(data["name"], str):
             raise ValueError("Field 'name' is required and must be a string.")
 
-        name = data["name"].strip()
+        name = data["name"].strip().lstrip("#").strip()
         if len(name) == 0 or len(name) > 50:
             raise ValueError("Field 'name' cannot be empty or exceed 50 characters.")
 
-        return cls(name=data["name"])
+        return cls(name=name)

@@ -80,7 +80,8 @@ async def handle_auth(request, env, path: str):
                     "INSERT INTO users (id, email, name, avatar_url, google_id, role)"
                     " VALUES (?, ?, ?, ?, ?, ?)"
                     " ON CONFLICT(google_id) DO UPDATE SET"
-                    " name=excluded.name, avatar_url=excluded.avatar_url,"
+                    " name=excluded.name,"
+                    " avatar_url=COALESCE(NULLIF(users.avatar_url, ''), excluded.avatar_url),"
                     " updated_at=datetime('now')"
                 )
                 .bind(

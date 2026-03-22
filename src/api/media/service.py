@@ -17,6 +17,17 @@ class MediaService:
         if self._ctx:
             await self._ctx.log.event(name, data=data)
 
+    def _detect_image_content_type(self, body: bytes) -> str | None:
+        if body.startswith(b"\xff\xd8\xff"):
+            return "image/jpeg"
+        if body.startswith(b"\x89PNG\r\n\x1a\n"):
+            return "image/png"
+        if body.startswith((b"GIF87a", b"GIF89a")):
+            return "image/gif"
+        if len(body) >= 12 and body[:4] == b"RIFF" and body[8:12] == b"WEBP":
+            return "image/webp"
+        return None
+
     async def upload(self, user_id: str, request) -> dict:
         raw_content_type = request.headers.get("Content-Type", "")
         content_type = raw_content_type.split(";", 1)[0].strip().lower()
@@ -26,6 +37,14 @@ class MediaService:
         size = len(body)
         if size <= 0:
             raise ValueError("Empty file upload")
+
+        # Be tolerant to browser/vendor aliases and unknown binary headers.
+        if content_type == "image/jpg":
+            content_type = "image/jpeg"
+        if content_type in ("", "application/octet-stream"):
+            detected_type = self._detect_image_content_type(body)
+            if detected_type:
+                content_type = detected_type
 
         try:
             key = await self._repo.upload(user_id, content_type, body, size)

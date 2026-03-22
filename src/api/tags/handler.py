@@ -1,5 +1,6 @@
 from utils.helpers import json_resp, error
 from middleware.auth import get_user, require_role
+from models.common.enums import UserRole
 from models.tag.requests import TagCreateRequest
 from api.tags.service import TagService
 
@@ -21,12 +22,12 @@ async def handle_tags(request, env, path, method, query, ctx):
             return error("Tag not found", 404)
         return json_resp({"tag": tag.to_dict()})
 
-    # POST /api/tags — SUPERADMIN only
+    # POST /api/tags — writable roles (AUTHOR/APPROVER/SUPERADMIN)
     if method == "POST":
         user = await get_user(request, env)
         if not user:
             return error("Unauthorised", 401)
-        if not require_role(user, ["SUPERADMIN"]):
+        if not require_role(user, UserRole.CAN_WRITE):
             return error("Forbidden", 403)
         try:
             req = TagCreateRequest.from_body(await request.json())

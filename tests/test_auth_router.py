@@ -45,15 +45,24 @@ class FakePrepared:
     async def run(self):
         if "INSERT INTO users" in self.sql:
             user_id, email, name, avatar_url, google_id, role = self.params
-            self.db.by_google_id[google_id] = {
-                "id": user_id,
-                "email": email,
-                "name": name,
-                "avatar_url": avatar_url,
-                "google_id": google_id,
-                "role": role,
-                "terms_accepted_at": None,
-            }
+            existing = self.db.by_google_id.get(google_id)
+            if existing:
+                existing["email"] = email
+                existing["name"] = name
+                # Keep custom avatar if already present; use Google avatar only when empty.
+                if not existing.get("avatar_url"):
+                    existing["avatar_url"] = avatar_url
+                existing["role"] = role
+            else:
+                self.db.by_google_id[google_id] = {
+                    "id": user_id,
+                    "email": email,
+                    "name": name,
+                    "avatar_url": avatar_url,
+                    "google_id": google_id,
+                    "role": role,
+                    "terms_accepted_at": None,
+                }
         return None
 
     async def first(self):
@@ -185,6 +194,43 @@ async def test_google_callback_success_returns_tokens_and_user(monkeypatch):
     assert "access_token" in body
     assert "refresh_token" in body
     assert body["user"]["email"] == "alice@example.com"
+
+
+@pytest.mark.asyncio
+async def test_google_callback_preserves_custom_avatar_on_login(monkeypatch):
+    async def fake_exchange_code(code, env):
+        return {
+            "id": "google-123",
+            "email": "alice@example.com",
+            "name": "Alice Updated",
+            "picture": "https://img.example.com/google-new.jpg",
+        }
+
+    monkeypatch.setattr(auth_router, "exchange_code", fake_exchange_code)
+
+    env = FakeEnv()
+    env.DB.by_google_id["google-123"] = {
+        "id": "existing-user",
+        "email": "alice@example.com",
+        "name": "Alice",
+        "avatar_url": "https://cdn.zenos.work/custom-avatar.jpg",
+        "google_id": "google-123",
+        "role": "AUTHOR",
+        "terms_accepted_at": None,
+    }
+
+    request = DummyRequest(
+        method="POST",
+        path="/auth/google/callback",
+        body={"code": "good-code"},
+    )
+
+    response = await auth_router.handle_auth(request, env, "/auth/google/callback")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["user"]["name"] == "Alice Updated"
+    assert body["user"]["avatar_url"] == "https://cdn.zenos.work/custom-avatar.jpg"
 
 
 @pytest.mark.asyncio
