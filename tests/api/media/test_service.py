@@ -69,6 +69,30 @@ class TestMediaService:
         assert result["key"] == "uploads/u1/file.png"
 
     @pytest.mark.asyncio
+    async def test_upload_normalizes_image_jpg_alias(self, monkeypatch):
+        svc = MediaService(_Env(), _Ctx())
+        repo = _Repo()
+        monkeypatch.setattr(svc, "_repo", repo)
+
+        await svc.upload("u1", _Req(body=b"\xff\xd8\xff\xe0", content_type="image/jpg"))
+
+        assert repo.upload_calls[0][1] == "image/jpeg"
+
+    @pytest.mark.asyncio
+    async def test_upload_detects_content_type_from_binary_signature(self, monkeypatch):
+        svc = MediaService(_Env(), _Ctx())
+        repo = _Repo()
+        monkeypatch.setattr(svc, "_repo", repo)
+
+        png_header = b"\x89PNG\r\n\x1a\nrest-of-file"
+        await svc.upload(
+            "u1",
+            _Req(body=png_header, content_type="application/octet-stream"),
+        )
+
+        assert repo.upload_calls[0][1] == "image/png"
+
+    @pytest.mark.asyncio
     async def test_upload_raises_for_empty_body(self, monkeypatch):
         svc = MediaService(_Env(), _Ctx())
         repo = _Repo()

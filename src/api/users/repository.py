@@ -17,19 +17,17 @@ class UserRepository(BaseRepository):
 
     async def find_all(self, limit: int = 20, offset: int = 0) -> List[User]:
         """Paginated list of all users, ordered by creation date."""
-        rows = (
-            await self._db.prepare(
-                "SELECT id, email, name, role, is_active, created_at, avatar_url"
-                " FROM users ORDER BY created_at DESC LIMIT ? OFFSET ?"
-            )
-            .bind(limit, offset)
-            .all()
+        rows = await self._ex.all(
+            "SELECT id, email, name, role, is_active, created_at, avatar_url"
+            " FROM users ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            limit,
+            offset,
         )
         return [self.map_one(row, User) for row in rows]
 
     async def count_all(self) -> int:
         """Total count of users."""
-        row = await self._db.prepare("SELECT COUNT(*) as cnt FROM users").first()
+        row = await self._ex.first("SELECT COUNT(*) as cnt FROM users")
         try:
             from models.base import row_get
 
@@ -52,13 +50,10 @@ class UserRepository(BaseRepository):
 
     async def update_avatar_only(self, user_id: str, avatar_url: Optional[str]) -> None:
         """Update only avatar, preserve existing name."""
-        await (
-            self._db.prepare(
-                'UPDATE users SET avatar_url = ?, updated_at = datetime("now")'
-                " WHERE id = ?"
-            )
-            .bind(avatar_url, user_id)
-            .run()
+        await self.execute(
+            'UPDATE users SET avatar_url = ?, updated_at = datetime("now") WHERE id = ?',
+            avatar_url,
+            user_id,
         )
 
     async def update_role(self, user_id: str, role: str) -> None:

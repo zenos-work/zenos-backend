@@ -4,13 +4,75 @@ from models.common.enums import Scope, UserRole
 from models.user.requests import UpdateProfileRequest, UpdateRoleRequest
 from api.users.service import UserService
 from api.media.service import MediaService
+from api.admin.service import AdminService
 
 
 async def handle_users(request, env, path, method, query, ctx):
     svc = UserService(env, ctx)
+    admin_svc = AdminService(env, ctx)
     parts = path.rstrip("/").split("/")
     user_id = parts[3] if len(parts) > 3 else None
     action = parts[4] if len(parts) > 4 else None
+
+    # GET /api/users/approvers (AUTHOR+ can see approver roster)
+    if method == "GET" and user_id == "approvers":
+        user = await get_user(request, env)
+        if not user:
+            return error("Unauthorised", 401)
+        if not require_role(user, UserRole.CAN_WRITE):
+            return error("Forbidden", 403)
+
+        users, _total = await svc.list_all(limit=200, offset=0)
+        approvers = [
+            u for u in users if u.get("role") in UserRole.CAN_APPROVE and u.get("id")
+        ]
+        return json_resp({"approvers": approvers})
+
+    # POST /api/users/approvers/message (AUTHOR+ sends approval chat message)
+    if method == "POST" and user_id == "approvers" and action == "message":
+        user = await get_user(request, env)
+        if not user:
+            return error("Unauthorised", 401)
+        if not require_role(user, UserRole.CAN_WRITE):
+            return error("Forbidden", 403)
+
+        body = await request.json()
+        data = body if isinstance(body, dict) else {}
+        message = str(data.get("message", "")).strip()
+        article_id = str(data.get("article_id", "")).strip() or None
+        mode = str(data.get("mode", "group")).strip().lower()
+        selected_ids = data.get("recipient_ids", [])
+
+        if not message:
+            return error("Message is required", 422)
+
+        users, _total = await svc.list_all(limit=200, offset=0)
+        approver_ids = {
+            u.get("id")
+            for u in users
+            if u.get("role") in UserRole.CAN_APPROVE and u.get("id")
+        }
+
+        if mode == "individual":
+            if not isinstance(selected_ids, list) or not selected_ids:
+                return error("Select at least one approver", 422)
+            targets = [uid for uid in selected_ids if uid in approver_ids]
+        else:
+            targets = list(approver_ids)
+
+        if not targets:
+            return error("No approver recipients found", 422)
+
+        for target_id in targets:
+            await admin_svc.create_notification(
+                user_id=target_id,
+                type_="COMMENT",
+                message=f"Approval chat: {message}",
+                actor_id=user["sub"],
+                article_id=article_id,
+            )
+
+        return json_resp({"status": "sent", "recipients": len(targets)})
 
     # GET /api/users  (admin only, paginated list)
     if method == "GET" and not user_id:
@@ -65,11 +127,16 @@ async def handle_users(request, env, path, method, query, ctx):
         user = await get_user(request, env)
         if not user:
             return error("Unauthorised", 401)
+        body = await request.json()
+        data = body if isinstance(body, dict) else {}
         try:
-            req = UpdateProfileRequest.from_body(await request.json())
+            req = UpdateProfileRequest.from_body(data)
         except ValueError as e:
             return error(str(e), 422)
-        await svc.update_profile(user["sub"], req)
+
+        # If request updates only avatar_url, keep existing name untouched.
+        avatar_only_update = req.name is None and req.avatar_url is not None
+        await svc.update_profile(user["sub"], req, skip_name_update=avatar_only_update)
         return json_resp({"status": "updated"})
 
     # PUT /api/users/me/prefs

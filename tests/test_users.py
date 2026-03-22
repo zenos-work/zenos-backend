@@ -7,6 +7,7 @@ import pytest
 from models.user.model import User
 from models.user.requests import UpdateProfileRequest, UpdateRoleRequest
 from models.common.enums import Scope, UserRole
+import api.users.handler as users_handler
 
 
 class TestUserModel:
@@ -211,6 +212,27 @@ class TestUsersEndpoints:
         assert fake_env.state["users"]["auth-user"].name == "Alice Brown"
         assert fake_env.state["profile_updates"][-1]["name"] == "Alice Brown"
 
+    def test_update_profile_avatar_only_preserves_name(
+        self, client, auth_token, fake_env
+    ):
+        """PUT /api/users/me avatar-only should skip name update"""
+        original_name = fake_env.state["users"]["auth-user"].name
+        response = client.put(
+            "/api/users/me",
+            headers={"Authorization": f"Bearer {auth_token}"},
+            json={
+                "avatar_url": "https://api.dicebear.com/9.x/adventurer/svg?seed=ZenosAtlas"
+            },
+        )
+
+        assert response.status_code == 200
+        assert response.json()["status"] == "updated"
+        assert fake_env.state["users"]["auth-user"].name == original_name
+        assert fake_env.state["users"]["auth-user"].avatar_url.endswith(
+            "seed=ZenosAtlas"
+        )
+        assert fake_env.state["profile_updates"][-1]["skip_name_update"] is True
+
     def test_upload_avatar(self, client, auth_token, fake_env):
         """POST /api/users/me/avatar"""
         image_data = b"fake image data"
@@ -307,3 +329,61 @@ class TestUsersEndpoints:
             fake_env.state["users"]["reader-user"].terms_accepted_at
             == "2026-03-18T12:00:00Z"
         )
+
+    def test_list_approvers_for_author(self, client, auth_token):
+        response = client.get(
+            "/api/users/approvers",
+            headers={"Authorization": f"Bearer {auth_token}"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "approvers" in data
+        assert all(
+            item["role"] in ["SUPERADMIN", "APPROVER"] for item in data["approvers"]
+        )
+
+    def test_send_approval_message_to_group(self, client, auth_token, monkeypatch):
+        created_notifications = []
+
+        class FakeAdminService:
+            def __init__(self, _env, _ctx):
+                pass
+
+            async def create_notification(self, **kwargs):
+                created_notifications.append(kwargs)
+
+        monkeypatch.setattr(users_handler, "AdminService", FakeAdminService)
+
+        response = client.post(
+            "/api/users/approvers/message",
+            headers={"Authorization": f"Bearer {auth_token}"},
+            json={
+                "mode": "group",
+                "article_id": "a1",
+                "message": "Please review this today",
+            },
+        )
+
+        assert response.status_code == 200
+        assert response.json()["status"] == "sent"
+        assert response.json()["recipients"] >= 1
+        assert len(created_notifications) >= 1
+        assert all("Approval chat" in item["message"] for item in created_notifications)
+
+    def test_send_approval_message_to_individual_requires_recipient(
+        self, client, auth_token
+    ):
+        response = client.post(
+            "/api/users/approvers/message",
+            headers={"Authorization": f"Bearer {auth_token}"},
+            json={
+                "mode": "individual",
+                "article_id": "a1",
+                "message": "Please review this",
+                "recipient_ids": [],
+            },
+        )
+
+        assert response.status_code == 422
+        assert response.json()["error"]["message"] == "Select at least one approver"

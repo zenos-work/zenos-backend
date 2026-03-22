@@ -169,7 +169,7 @@ def _token(role="AUTHOR", sub="auth-user"):
 class TestTagCreateRequest:
     def test_valid_name(self):
         req = TagCreateRequest.from_body({"name": "  Fintech  "})
-        assert req.name == "  Fintech  "
+        assert req.name == "Fintech"
 
     def test_missing_name(self):
         with pytest.raises(ValueError, match="required"):
@@ -182,6 +182,10 @@ class TestTagCreateRequest:
     def test_name_too_long(self):
         with pytest.raises(ValueError, match="50"):
             TagCreateRequest.from_body({"name": "X" * 51})
+
+    def test_hashtag_name_is_normalized(self):
+        req = TagCreateRequest.from_body({"name": " #FinOps "})
+        assert req.name == "FinOps"
 
 
 class TestTagModel:
@@ -247,22 +251,33 @@ class TestTagsEndpoints:
         r = client.post("/api/tags", json={"name": "Payments"})
         assert r.status_code == 401
 
-    def test_create_tag_requires_superadmin(self, client, author_token):
+    def test_create_tag_requires_writable_role(self, client):
+        reader_token = _token(role="READER", sub="reader-user")
+        r = client.post(
+            "/api/tags",
+            headers={"Authorization": f"Bearer {reader_token}"},
+            json={"name": "Payments"},
+        )
+        assert r.status_code == 403
+
+    def test_create_tag_author(self, client, author_token):
         r = client.post(
             "/api/tags",
             headers={"Authorization": f"Bearer {author_token}"},
             json={"name": "Payments"},
         )
-        assert r.status_code == 403
+        assert r.status_code == 201
+        assert r.json()["tag"]["slug"] == "payments"
 
-    def test_create_tag_superadmin(self, client, superadmin_token):
+    def test_create_tag_with_hashtag(self, client, superadmin_token):
         r = client.post(
             "/api/tags",
             headers={"Authorization": f"Bearer {superadmin_token}"},
-            json={"name": "Payments"},
+            json={"name": "#Cloud"},
         )
         assert r.status_code == 201
-        assert r.json()["tag"]["slug"] == "payments"
+        assert r.json()["tag"]["name"] == "Cloud"
+        assert r.json()["tag"]["slug"] == "cloud"
 
     def test_create_tag_validation_error(self, client, superadmin_token):
         r = client.post(
