@@ -49,14 +49,17 @@ SELECT_TAGS_FOR_ARTICLE = (
 INSERT_ARTICLE = (
     "INSERT INTO articles"
     " (id, author_id, title, slug, subtitle, content,"
-    "  cover_image_url, read_time_minutes, status)"
-    " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    "  cover_image_url, read_time_minutes, status,"
+    "  last_verified_at, expires_at, seo_title, seo_description, canonical_url, og_image_url, seo_schema_type)"
+    " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
 )
 
 UPDATE_ARTICLE = (
     "UPDATE articles"
     " SET title = ?, content = ?, subtitle = ?,"
     "     cover_image_url = ?, read_time_minutes = ?,"
+    "     last_verified_at = ?, expires_at = ?,"
+    "     seo_title = ?, seo_description = ?, canonical_url = ?, og_image_url = ?, seo_schema_type = ?,"
     '     updated_at = datetime("now")'
     " WHERE id = ?"
 )
@@ -67,13 +70,13 @@ UPDATE_STATUS = (
 
 UPDATE_APPROVE = (
     "UPDATE articles"
-    ' SET status = ?, approved_by = ?, updated_at = datetime("now")'
+    ' SET status = ?, approved_by = ?, moderation_state = ?, moderation_note = ?, updated_at = datetime("now")'
     " WHERE id = ? AND status = ?"
 )
 
 UPDATE_REJECT = (
     "UPDATE articles"
-    ' SET status = ?, rejection_note = ?, updated_at = datetime("now")'
+    ' SET status = ?, rejection_note = ?, moderation_state = ?, moderation_note = ?, updated_at = datetime("now")'
     " WHERE id = ?"
 )
 
@@ -82,6 +85,12 @@ UPDATE_PUBLISH = (
     ' SET status = ?, published_at = datetime("now"),'
     '     updated_at = datetime("now")'
     " WHERE id = ? AND status = ?"
+)
+
+UPDATE_MODERATION_STATE = (
+    "UPDATE articles"
+    ' SET moderation_state = ?, moderation_note = ?, updated_at = datetime("now")'
+    " WHERE id = ?"
 )
 
 UPDATE_INCREMENT_VIEWS = (
@@ -107,3 +116,13 @@ INSERT_ARTICLE_TAG = (
 )
 
 DELETE_ARTICLE_TAGS = "DELETE FROM article_tags WHERE article_id = ?"
+
+SELECT_APPROVER_IDS = (
+    "SELECT id FROM users" " WHERE role IN ('APPROVER', 'SUPERADMIN') AND is_active = 1"
+)
+
+INSERT_NOTIFICATION = (
+    "INSERT INTO notifications"
+    " (id, user_id, actor_id, type, article_id, comment_id, message)"
+    " VALUES (?, ?, ?, ?, ?, ?, ?)"
+)

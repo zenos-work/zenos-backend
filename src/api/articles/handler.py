@@ -1,6 +1,6 @@
 from utils.helpers import json_resp, error
 from middleware.auth import get_user, require_role
-from models.common.enums import Scope, ArticleStatus, UserRole
+from models.common.enums import Scope, ArticleStatus, UserRole, NotificationType
 from models.article.requests import (
     ArticleCreateRequest,
     ArticleUpdateRequest,
@@ -47,6 +47,13 @@ async def handle_articles(request, env, path, method, query, ctx):
             return error("Article not found", 404)
         await svc.increment_views(article.id)
         return json_resp({"article": article.to_dict(Scope.DETAIL)})
+
+    # GET /api/articles/:id/schema
+    if method == "GET" and art_id and action == "schema":
+        article = await svc.get_by_id_or_slug(art_id)
+        if not article:
+            return error("Article not found", 404)
+        return json_resp({"schema": await svc.build_schema(article)})
 
     # POST /api/articles
     if method == "POST" and not art_id:
@@ -111,8 +118,23 @@ async def handle_articles(request, env, path, method, query, ctx):
                 return error("Forbidden", 403)
             if article.status not in ArticleStatus.EDITABLE:
                 return error("Only DRAFT or REJECTED articles can be submitted", 409)
+            moderation = {
+                "decision": "pending_admin",
+                "state": "AUTO_APPROVED_PENDING_ADMIN",
+                "note": "Auto-check passed. Pending admin/superadmin approval.",
+            }
+            if hasattr(svc, "run_auto_moderation"):
+                moderation = await svc.run_auto_moderation(article)
+            if moderation["decision"] == "rejected":
+                return json_resp(
+                    {
+                        "status": ArticleStatus.REJECTED,
+                        "moderation": moderation,
+                    },
+                    409,
+                )
             new_status = await svc.transition(art_id, ArticleStatus.SUBMITTED)
-            return json_resp({"status": new_status})
+            return json_resp({"status": new_status, "moderation": moderation})
 
         # POST /api/articles/:id/approve
         if action == "approve":
@@ -123,6 +145,14 @@ async def handle_articles(request, env, path, method, query, ctx):
             new_status = await svc.transition(
                 art_id, ArticleStatus.APPROVED, actor_id=user["sub"]
             )
+            if hasattr(svc, "notify_user"):
+                await svc.notify_user(
+                    user_id=article.author_id,
+                    type_=NotificationType.APPROVED,
+                    message=f"Your article '{article.title}' was approved.",
+                    article_id=article.id,
+                    actor_id=user["sub"],
+                )
             return json_resp({"status": new_status})
 
         # POST /api/articles/:id/reject
@@ -138,6 +168,14 @@ async def handle_articles(request, env, path, method, query, ctx):
             new_status = await svc.transition(
                 art_id, ArticleStatus.REJECTED, note=req.note
             )
+            if hasattr(svc, "notify_user"):
+                await svc.notify_user(
+                    user_id=article.author_id,
+                    type_=NotificationType.REJECTED,
+                    message=f"Your article '{article.title}' was rejected. {req.note}",
+                    article_id=article.id,
+                    actor_id=user["sub"],
+                )
             return json_resp({"status": new_status})
 
         # POST /api/articles/:id/publish
@@ -147,6 +185,14 @@ async def handle_articles(request, env, path, method, query, ctx):
             if article.status != ArticleStatus.APPROVED:
                 return error("Only APPROVED articles can be published", 409)
             new_status = await svc.transition(art_id, ArticleStatus.PUBLISHED)
+            if hasattr(svc, "notify_user"):
+                await svc.notify_user(
+                    user_id=article.author_id,
+                    type_=NotificationType.PUBLISHED,
+                    message=f"Your article '{article.title}' is now published.",
+                    article_id=article.id,
+                    actor_id=user["sub"],
+                )
             return json_resp({"status": new_status})
 
         # POST /api/articles/:id/archive

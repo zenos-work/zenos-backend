@@ -119,6 +119,13 @@ class ArticleRepository(BaseRepository):
         cover_image_url: Optional[str],
         read_time: int,
         status: str,
+        last_verified_at: Optional[str],
+        expires_at: Optional[str],
+        seo_title: Optional[str],
+        seo_description: Optional[str],
+        canonical_url: Optional[str],
+        og_image_url: Optional[str],
+        seo_schema_type: Optional[str],
     ) -> Article:
         await self.execute(
             Q.INSERT_ARTICLE,
@@ -131,6 +138,13 @@ class ArticleRepository(BaseRepository):
             self._optional_text(cover_image_url),
             read_time,
             status,
+            self._optional_text(last_verified_at),
+            self._optional_text(expires_at),
+            self._optional_text(seo_title),
+            self._optional_text(seo_description),
+            self._optional_text(canonical_url),
+            self._optional_text(og_image_url),
+            self._optional_text(seo_schema_type or "Article"),
         )
         row = await self.find_one(Q.SELECT_BY_ID_OR_SLUG, aid, aid)
         article = self.map_one(row, Article)
@@ -145,6 +159,13 @@ class ArticleRepository(BaseRepository):
         subtitle: Optional[str],
         cover_image_url: Optional[str],
         read_time: int,
+        last_verified_at: Optional[str],
+        expires_at: Optional[str],
+        seo_title: Optional[str],
+        seo_description: Optional[str],
+        canonical_url: Optional[str],
+        og_image_url: Optional[str],
+        seo_schema_type: Optional[str],
     ) -> Article:
         await self.execute(
             Q.UPDATE_ARTICLE,
@@ -153,6 +174,13 @@ class ArticleRepository(BaseRepository):
             self._optional_text(subtitle),
             self._optional_text(cover_image_url),
             read_time,
+            self._optional_text(last_verified_at),
+            self._optional_text(expires_at),
+            self._optional_text(seo_title),
+            self._optional_text(seo_description),
+            self._optional_text(canonical_url),
+            self._optional_text(og_image_url),
+            self._optional_text(seo_schema_type or "Article"),
             article_id,
         )
         row = await self.find_one(Q.SELECT_BY_ID_OR_SLUG, article_id, article_id)
@@ -169,6 +197,8 @@ class ArticleRepository(BaseRepository):
         status: str,
         approved_by: str = None,
         rejection_note: str = None,
+        moderation_state: str = None,
+        moderation_note: str = None,
         publish: bool = False,
     ) -> None:
         if approved_by:
@@ -176,6 +206,8 @@ class ArticleRepository(BaseRepository):
                 Q.UPDATE_APPROVE,
                 status,
                 approved_by,
+                moderation_state or "APPROVED_BY_ADMIN",
+                self._optional_text(moderation_note),
                 article_id,
                 "SUBMITTED",
             )
@@ -184,6 +216,8 @@ class ArticleRepository(BaseRepository):
                 Q.UPDATE_REJECT,
                 status,
                 rejection_note,
+                moderation_state or "REJECTED_BY_ADMIN",
+                self._optional_text(moderation_note),
                 article_id,
             )
         elif publish:
@@ -195,6 +229,19 @@ class ArticleRepository(BaseRepository):
             )
         else:
             await self.execute(Q.UPDATE_STATUS, status, article_id)
+
+    async def update_moderation_state(
+        self,
+        article_id: str,
+        moderation_state: str,
+        moderation_note: Optional[str] = None,
+    ) -> None:
+        await self.execute(
+            Q.UPDATE_MODERATION_STATE,
+            moderation_state,
+            self._optional_text(moderation_note),
+            article_id,
+        )
 
     async def sync_tags(self, article_id: str, tag_ids: list) -> None:
         await self.execute(Q.DELETE_ARTICLE_TAGS, article_id)
@@ -212,3 +259,29 @@ class ArticleRepository(BaseRepository):
 
     async def increment_comments(self, article_id: str) -> None:
         await self.execute(Q.UPDATE_INCREMENT_COMMENTS, article_id)
+
+    async def list_approver_ids(self) -> list[str]:
+        from models.base import row_get
+
+        rows = await self.find_all(Q.SELECT_APPROVER_IDS)
+        return [row_get(r, "id") for r in rows if row_get(r, "id")]
+
+    async def insert_notification(
+        self,
+        nid: str,
+        user_id: str,
+        actor_id: Optional[str],
+        type_: str,
+        article_id: Optional[str],
+        message: str,
+    ) -> None:
+        await self.execute(
+            Q.INSERT_NOTIFICATION,
+            nid,
+            user_id,
+            actor_id,
+            type_,
+            article_id,
+            None,
+            message,
+        )

@@ -11,7 +11,13 @@ SELECT_ARTICLES_FTS = (
     " JOIN articles a ON a.id = articles_fts.article_id"
     " JOIN users u ON a.author_id = u.id"
     " WHERE articles_fts MATCH ?"
-    " AND a.status = 'PUBLISHED'"
+    " AND (? IS NULL OR a.status = ?)"
+    " AND (? = 0 OR (a.expires_at IS NULL OR a.expires_at > datetime('now')))"
+    " AND (? IS NULL OR EXISTS ("
+    "   SELECT 1 FROM article_tags at"
+    "   JOIN tags t ON t.id = at.tag_id"
+    "   WHERE at.article_id = a.id AND t.slug = ? AND t.tag_type = 'outcome'"
+    " ))"
     " ORDER BY rank"
     " LIMIT ? OFFSET ?"
 )
@@ -21,7 +27,13 @@ COUNT_ARTICLES_FTS = (
     " FROM articles_fts"
     " JOIN articles a ON a.id = articles_fts.article_id"
     " WHERE articles_fts MATCH ?"
-    " AND a.status = 'PUBLISHED'"
+    " AND (? IS NULL OR a.status = ?)"
+    " AND (? = 0 OR (a.expires_at IS NULL OR a.expires_at > datetime('now')))"
+    " AND (? IS NULL OR EXISTS ("
+    "   SELECT 1 FROM article_tags at"
+    "   JOIN tags t ON t.id = at.tag_id"
+    "   WHERE at.article_id = a.id AND t.slug = ? AND t.tag_type = 'outcome'"
+    " ))"
 )
 
 # ── Tags ──────────────────────────────────────────────────────────────────────

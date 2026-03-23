@@ -7,4 +7,4 @@ SELECT_ALL_WITH_COUNT = (
 
 SELECT_BY_SLUG_OR_ID = "SELECT * FROM tags WHERE slug = ? OR id = ?"
 
-INSERT_TAG = "INSERT INTO tags (id, name, slug) VALUES (?, ?, ?)"
+INSERT_TAG = "INSERT INTO tags (id, name, slug, tag_type) VALUES (?, ?, ?, ?)"

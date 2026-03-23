@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Optional
 from models.base import BaseModel, row_get
 from models.common.enums import Scope
@@ -18,9 +19,19 @@ _LIST_FIELDS = {
     "is_featured",
     "published_at",
     "created_at",
+    "last_verified_at",
+    "expires_at",
+    "moderation_state",
+    "moderation_note",
+    "seo_title",
+    "seo_description",
+    "canonical_url",
+    "og_image_url",
+    "seo_schema_type",
     "author_name",
     "author_avatar",
     "tags",
+    "is_expired",
 }
 _DETAIL_FIELDS = _LIST_FIELDS | {"content", "updated_at"}
 _ADMIN_FIELDS = _DETAIL_FIELDS | {"rejection_note", "approved_by"}
@@ -49,6 +60,15 @@ class Article(BaseModel):
     cover_image_url: Optional[str] = None
     published_at: Optional[str] = None
     rejection_note: Optional[str] = None
+    last_verified_at: Optional[str] = None
+    expires_at: Optional[str] = None
+    moderation_state: str = "NOT_REVIEWED"
+    moderation_note: Optional[str] = None
+    seo_title: Optional[str] = None
+    seo_description: Optional[str] = None
+    canonical_url: Optional[str] = None
+    og_image_url: Optional[str] = None
+    seo_schema_type: str = "Article"
     # FIX: approved_by was Optional[int] — should be Optional[str] (UUID)
     approved_by: Optional[str] = None
     author_name: Optional[str] = None
@@ -63,12 +83,21 @@ class Article(BaseModel):
         }.get(scope, _LIST_FIELDS)
         result = {}
         for k in allowed:
+            if k == "is_expired":
+                result[k] = self.is_expired()
+                continue
             v = getattr(self, k, None)
             if v is None:
                 continue
             # FIX: tags must be serialised as dicts, not raw objects
             result[k] = [t.to_dict() for t in v] if k == "tags" else v
         return result
+
+    def is_expired(self) -> bool:
+        if not self.expires_at:
+            return False
+        now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+        return str(self.expires_at) < now
 
     @classmethod
     def from_row(cls, row) -> "Article":
@@ -90,6 +119,15 @@ class Article(BaseModel):
             cover_image_url=row_get(row, "cover_image_url"),
             published_at=row_get(row, "published_at"),
             rejection_note=row_get(row, "rejection_note"),
+            last_verified_at=row_get(row, "last_verified_at"),
+            expires_at=row_get(row, "expires_at"),
+            moderation_state=row_get(row, "moderation_state", "NOT_REVIEWED"),
+            moderation_note=row_get(row, "moderation_note"),
+            seo_title=row_get(row, "seo_title"),
+            seo_description=row_get(row, "seo_description"),
+            canonical_url=row_get(row, "canonical_url"),
+            og_image_url=row_get(row, "og_image_url"),
+            seo_schema_type=row_get(row, "seo_schema_type", "Article"),
             approved_by=row_get(row, "approved_by"),
             author_name=row_get(row, "author_name"),
             author_avatar=row_get(row, "author_avatar"),

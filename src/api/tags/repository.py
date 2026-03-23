@@ -15,5 +15,5 @@ class TagRepository(BaseRepository):
         row = await self.find_one(Q.SELECT_BY_SLUG_OR_ID, identifier, identifier)
         return self.map_one(row, Tag)
 
-    async def insert(self, tid: str, name: str, slug: str) -> None:
-        await self.execute(Q.INSERT_TAG, tid, name, slug)
+    async def insert(self, tid: str, name: str, slug: str, tag_type: str) -> None:
+        await self.execute(Q.INSERT_TAG, tid, name, slug, tag_type)
