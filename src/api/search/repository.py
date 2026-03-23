@@ -17,12 +17,44 @@ class SearchRepository(BaseRepository):
 
     # ── Articles FTS ──────────────────────────────────────────────────────────
 
-    async def find_articles(self, fts_query: str, limit: int, offset: int) -> list:
-        rows = await self.find_all(Q.SELECT_ARTICLES_FTS, fts_query, limit, offset)
+    async def find_articles(
+        self,
+        fts_query: str,
+        limit: int,
+        offset: int,
+        status: str = "PUBLISHED",
+        outcome_tag: str = None,
+        verified_only: bool = False,
+    ) -> list:
+        rows = await self.find_all(
+            Q.SELECT_ARTICLES_FTS,
+            fts_query,
+            status,
+            status,
+            1 if verified_only else 0,
+            outcome_tag,
+            outcome_tag,
+            limit,
+            offset,
+        )
         return self.map_many(rows, Article)
 
-    async def count_articles(self, fts_query: str) -> int:
-        row = await self.find_one(Q.COUNT_ARTICLES_FTS, fts_query)
+    async def count_articles(
+        self,
+        fts_query: str,
+        status: str = "PUBLISHED",
+        outcome_tag: str = None,
+        verified_only: bool = False,
+    ) -> int:
+        row = await self.find_one(
+            Q.COUNT_ARTICLES_FTS,
+            fts_query,
+            status,
+            status,
+            1 if verified_only else 0,
+            outcome_tag,
+            outcome_tag,
+        )
         return self._extract_count(row)
 
     # ── Tags ──────────────────────────────────────────────────────────────────

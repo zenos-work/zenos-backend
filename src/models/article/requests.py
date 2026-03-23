@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Optional, List
 from models.base import BaseRequest
 
@@ -13,6 +14,15 @@ def _normalize_optional_text(value) -> Optional[str]:
     return text
 
 
+def _normalize_optional_datetime(value, field_name: str) -> Optional[str]:
+    text = _normalize_optional_text(value)
+    if text is None:
+        return None
+    # Accept ISO-8601 and normalize to sqlite-friendly UTC string.
+    parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    return parsed.strftime("%Y-%m-%d %H:%M:%S")
+
+
 @dataclass
 class ArticleCreateRequest(BaseRequest):
     """Create a new article (DRAFT status by default)."""
@@ -21,6 +31,13 @@ class ArticleCreateRequest(BaseRequest):
     content: str
     subtitle: Optional[str] = None
     cover_image_url: Optional[str] = None
+    last_verified_at: Optional[str] = None
+    expires_at: Optional[str] = None
+    seo_title: Optional[str] = None
+    seo_description: Optional[str] = None
+    canonical_url: Optional[str] = None
+    og_image_url: Optional[str] = None
+    seo_schema_type: Optional[str] = None
     tag_ids: List[str] = field(default_factory=list)
 
     @classmethod
@@ -50,6 +67,35 @@ class ArticleCreateRequest(BaseRequest):
 
         cover_image_url = _normalize_optional_text(data.get("cover_image_url"))
 
+        try:
+            last_verified_at = _normalize_optional_datetime(
+                data.get("last_verified_at"), "last_verified_at"
+            )
+            expires_at = _normalize_optional_datetime(
+                data.get("expires_at"), "expires_at"
+            )
+        except ValueError:
+            raise ValueError("Invalid datetime format. Use ISO-8601 date/time")
+
+        seo_title = _normalize_optional_text(data.get("seo_title"))
+        seo_description = _normalize_optional_text(data.get("seo_description"))
+        canonical_url = _normalize_optional_text(data.get("canonical_url"))
+        og_image_url = _normalize_optional_text(data.get("og_image_url"))
+        seo_schema_type = _normalize_optional_text(data.get("seo_schema_type"))
+
+        if seo_title and len(seo_title) > 160:
+            raise ValueError("seo_title cannot exceed 160 characters")
+        if seo_description and len(seo_description) > 320:
+            raise ValueError("seo_description cannot exceed 320 characters")
+        if seo_schema_type and seo_schema_type not in {
+            "Article",
+            "TechArticle",
+            "HowTo",
+        }:
+            raise ValueError(
+                "seo_schema_type must be one of: Article, TechArticle, HowTo"
+            )
+
         tag_ids = data.get("tag_ids", [])
         if not isinstance(tag_ids, list):
             raise ValueError("tag_ids must be a list")
@@ -61,6 +107,13 @@ class ArticleCreateRequest(BaseRequest):
             content=content,
             subtitle=subtitle if subtitle else None,
             cover_image_url=cover_image_url,
+            last_verified_at=last_verified_at,
+            expires_at=expires_at,
+            seo_title=seo_title,
+            seo_description=seo_description,
+            canonical_url=canonical_url,
+            og_image_url=og_image_url,
+            seo_schema_type=seo_schema_type,
             tag_ids=tag_ids,
         )
 
@@ -73,6 +126,13 @@ class ArticleUpdateRequest(BaseRequest):
     content: Optional[str] = None
     subtitle: Optional[str] = None
     cover_image_url: Optional[str] = None
+    last_verified_at: Optional[str] = None
+    expires_at: Optional[str] = None
+    seo_title: Optional[str] = None
+    seo_description: Optional[str] = None
+    canonical_url: Optional[str] = None
+    og_image_url: Optional[str] = None
+    seo_schema_type: Optional[str] = None
     tag_ids: Optional[List[str]] = None
 
     @classmethod
@@ -101,6 +161,35 @@ class ArticleUpdateRequest(BaseRequest):
 
         cover_image_url = _normalize_optional_text(data.get("cover_image_url"))
 
+        try:
+            last_verified_at = _normalize_optional_datetime(
+                data.get("last_verified_at"), "last_verified_at"
+            )
+            expires_at = _normalize_optional_datetime(
+                data.get("expires_at"), "expires_at"
+            )
+        except ValueError:
+            raise ValueError("Invalid datetime format. Use ISO-8601 date/time")
+
+        seo_title = _normalize_optional_text(data.get("seo_title"))
+        seo_description = _normalize_optional_text(data.get("seo_description"))
+        canonical_url = _normalize_optional_text(data.get("canonical_url"))
+        og_image_url = _normalize_optional_text(data.get("og_image_url"))
+        seo_schema_type = _normalize_optional_text(data.get("seo_schema_type"))
+
+        if seo_title is not None and len(seo_title) > 160:
+            raise ValueError("seo_title cannot exceed 160 characters")
+        if seo_description is not None and len(seo_description) > 320:
+            raise ValueError("seo_description cannot exceed 320 characters")
+        if seo_schema_type is not None and seo_schema_type not in {
+            "Article",
+            "TechArticle",
+            "HowTo",
+        }:
+            raise ValueError(
+                "seo_schema_type must be one of: Article, TechArticle, HowTo"
+            )
+
         tag_ids = data.get("tag_ids")
         if tag_ids is not None:
             if not isinstance(tag_ids, list):
@@ -113,6 +202,13 @@ class ArticleUpdateRequest(BaseRequest):
             content=content,
             subtitle=subtitle,
             cover_image_url=cover_image_url,
+            last_verified_at=last_verified_at,
+            expires_at=expires_at,
+            seo_title=seo_title,
+            seo_description=seo_description,
+            canonical_url=canonical_url,
+            og_image_url=og_image_url,
+            seo_schema_type=seo_schema_type,
             tag_ids=tag_ids,
         )
 

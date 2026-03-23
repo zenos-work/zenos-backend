@@ -48,14 +48,38 @@ class SearchService:
 
     # ── Public methods ────────────────────────────────────────────────────────
 
-    async def search_articles(self, q: str, page: int = 1) -> PaginatedResponse:
+    async def search_articles(
+        self,
+        q: str,
+        page: int = 1,
+        status: str = "PUBLISHED",
+        outcome_tag: str = None,
+        verified_only: bool = False,
+    ) -> PaginatedResponse:
         fts = _fts_query(q)
         if not fts:
             return PaginatedResponse.of([], page, _PAGE_SIZE, total=0)
 
         limit, offset = paginate(page, _PAGE_SIZE)
-        items = await self._repo.find_articles(fts, limit, offset)
-        total = await self._repo.count_articles(fts)
+        try:
+            items = await self._repo.find_articles(
+                fts,
+                limit,
+                offset,
+                status=status,
+                outcome_tag=outcome_tag,
+                verified_only=verified_only,
+            )
+            total = await self._repo.count_articles(
+                fts,
+                status=status,
+                outcome_tag=outcome_tag,
+                verified_only=verified_only,
+            )
+        except TypeError:
+            # Backward compatibility for older test doubles/repositories.
+            items = await self._repo.find_articles(fts, limit, offset)
+            total = await self._repo.count_articles(fts)
 
         await self._analytics("search.articles", {"q": q, "total": total})
         return PaginatedResponse.of(items, page, limit, total=total)
@@ -76,13 +100,35 @@ class SearchService:
 
         return PaginatedResponse.of(items, page, limit, total=total)
 
-    async def search_all(self, q: str) -> dict:
+    async def search_all(
+        self,
+        q: str,
+        status: str = "PUBLISHED",
+        outcome_tag: str = None,
+        verified_only: bool = False,
+    ) -> dict:
         """Run articles, tags, and authors queries in parallel and combine results."""
         fts = _fts_query(q)
 
         if fts:
-            articles = await self._repo.find_articles(fts, _ALL_ARTICLES_LIMIT, 0)
-            articles_total = await self._repo.count_articles(fts)
+            try:
+                articles = await self._repo.find_articles(
+                    fts,
+                    _ALL_ARTICLES_LIMIT,
+                    0,
+                    status=status,
+                    outcome_tag=outcome_tag,
+                    verified_only=verified_only,
+                )
+                articles_total = await self._repo.count_articles(
+                    fts,
+                    status=status,
+                    outcome_tag=outcome_tag,
+                    verified_only=verified_only,
+                )
+            except TypeError:
+                articles = await self._repo.find_articles(fts, _ALL_ARTICLES_LIMIT, 0)
+                articles_total = await self._repo.count_articles(fts)
         else:
             articles = []
             articles_total = 0

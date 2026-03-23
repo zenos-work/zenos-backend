@@ -20,5 +20,5 @@ class TagService:
     async def create(self, req: TagCreateRequest) -> Tag:
         tid = new_id()
         slug = slugify(req.name)
-        await self._repo.insert(tid, req.name, slug)
-        return Tag(id=tid, name=req.name, slug=slug)
+        await self._repo.insert(tid, req.name, slug, req.tag_type)
+        return Tag(id=tid, name=req.name, slug=slug, tag_type=req.tag_type)

@@ -23,10 +23,21 @@ async def handle_search(request, env, path, method, query, ctx):
     except (ValueError, TypeError):
         pass
 
+    status = (query.get("status", ["PUBLISHED"]) or ["PUBLISHED"])[0].strip().upper()
+    outcome_tag = (query.get("outcome_tag", [None]) or [None])[0]
+    verified_only_raw = (query.get("verified_only", ["false"]) or ["false"])[0]
+    verified_only = str(verified_only_raw).strip().lower() in {"1", "true", "yes"}
+
     svc = SearchService(env, ctx)
 
     if search_type == "articles":
-        result = await svc.search_articles(q, page)
+        result = await svc.search_articles(
+            q,
+            page,
+            status=status,
+            outcome_tag=outcome_tag,
+            verified_only=verified_only,
+        )
         return json_resp(result.to_dict(Scope.LIST))
 
     if search_type == "tags":
@@ -38,7 +49,12 @@ async def handle_search(request, env, path, method, query, ctx):
         return json_resp(result.to_dict(Scope.PUBLIC))
 
     # type == "all"
-    result = await svc.search_all(q)
+    result = await svc.search_all(
+        q,
+        status=status,
+        outcome_tag=outcome_tag,
+        verified_only=verified_only,
+    )
     return json_resp(_serialize_all(result))
 
 
