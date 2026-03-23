@@ -40,6 +40,13 @@ class _ReqCreate:
     content = "x" * 80
     cover_image_url = "https://img"
     tag_ids = ["t1", "t2"]
+    last_verified_at = None
+    expires_at = None
+    seo_title = None
+    seo_description = None
+    canonical_url = None
+    og_image_url = None
+    seo_schema_type = None
 
 
 class _ReqUpdate:
@@ -48,6 +55,13 @@ class _ReqUpdate:
     content = "y" * 90
     cover_image_url = "https://img2"
     tag_ids = ["t3"]
+    last_verified_at = None
+    expires_at = None
+    seo_title = None
+    seo_description = None
+    canonical_url = None
+    og_image_url = None
+    seo_schema_type = None
 
 
 class TestArticleService:
@@ -66,7 +80,20 @@ class TestArticleService:
                 return [{"id": "t1"}]
 
             async def update(
-                self, article_id, title, content, subtitle, cover, read_time
+                self,
+                article_id,
+                title,
+                content,
+                subtitle,
+                cover,
+                read_time,
+                last_verified_at=None,
+                expires_at=None,
+                seo_title=None,
+                seo_description=None,
+                canonical_url=None,
+                og_image_url=None,
+                seo_schema_type=None,
             ):
                 a = _article(id=article_id, title=title)
                 a.subtitle = subtitle
@@ -246,9 +273,38 @@ class TestArticleRepository:
         repo._fetch_tags = _fetch_tags
 
         inserted = await repo.insert(
-            "a1", "u1", "t", "slug", None, "c", None, 1, "DRAFT"
+            "a1",
+            "u1",
+            "t",
+            "slug",
+            None,
+            "c",
+            None,
+            1,
+            "DRAFT",
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
         )
-        updated = await repo.update("a1", "t2", "c2", None, None, 2)
+        updated = await repo.update(
+            "a1",
+            "t2",
+            "c2",
+            None,
+            None,
+            2,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
 
         assert inserted.id == "a1"
         assert updated.id == "a1"
