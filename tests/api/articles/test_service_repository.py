@@ -37,6 +37,7 @@ def _article(id="a1", title="Title", status=ArticleStatus.DRAFT):
 class _ReqCreate:
     title = "New title"
     subtitle = "sub"
+    content_type = "article"
     content = "x" * 80
     cover_image_url = "https://img"
     tag_ids = ["t1", "t2"]
@@ -52,6 +53,7 @@ class _ReqCreate:
 class _ReqUpdate:
     title = "Updated"
     subtitle = "updated-sub"
+    content_type = "how-to"
     content = "y" * 90
     cover_image_url = "https://img2"
     tag_ids = ["t3"]
@@ -70,6 +72,9 @@ class TestArticleService:
         svc = ArticleService(_Env())
 
         class _Repo:
+            async def is_valid_content_type(self, _content_type):
+                return True
+
             async def insert(self, *args):
                 return _article(id=args[0], title=args[2], status=args[-1])
 
@@ -85,6 +90,7 @@ class TestArticleService:
                 title,
                 content,
                 subtitle,
+                content_type,
                 cover,
                 read_time,
                 last_verified_at=None,
@@ -97,6 +103,7 @@ class TestArticleService:
             ):
                 a = _article(id=article_id, title=title)
                 a.subtitle = subtitle
+                a.content_type = content_type
                 a.cover_image_url = cover
                 a.read_time_minutes = read_time
                 return a
@@ -278,6 +285,7 @@ class TestArticleRepository:
             "t",
             "slug",
             None,
+            "article",
             "c",
             None,
             1,
@@ -295,6 +303,7 @@ class TestArticleRepository:
             "t2",
             "c2",
             None,
+            "how-to",
             None,
             2,
             None,
@@ -309,9 +318,11 @@ class TestArticleRepository:
         assert inserted.id == "a1"
         assert updated.id == "a1"
         assert executed[0][1][4] == ""
-        assert executed[0][1][6] == ""
+        assert executed[0][1][5] == "article"
+        assert executed[0][1][7] == ""
         assert executed[1][1][2] == ""
-        assert executed[1][1][3] == ""
+        assert executed[1][1][3] == "how-to"
+        assert executed[1][1][4] == ""
 
         await repo.set_status("a1", "APPROVED", approved_by="approver")
         await repo.set_status("a1", "REJECTED", rejection_note="bad")

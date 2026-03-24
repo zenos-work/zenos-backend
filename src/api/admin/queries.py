@@ -81,3 +81,21 @@ INSERT_NOTIFICATION = (
 UPDATE_MARK_NOTIFICATIONS_READ = (
     "UPDATE notifications SET is_read = 1" " WHERE user_id = ? AND is_read = 0"
 )
+
+SELECT_CONTENT_TYPES_ADMIN = (
+    "SELECT id, slug, name, description, is_active, is_system, sort_order, created_by, created_at, updated_at"
+    " FROM content_types"
+    " ORDER BY sort_order ASC, name ASC"
+)
+
+SELECT_CONTENT_TYPE_BY_SLUG = (
+    "SELECT id, slug, name, description, is_active, is_system, sort_order, created_by, created_at, updated_at"
+    " FROM content_types"
+    " WHERE slug = ?"
+    " LIMIT 1"
+)
+
+INSERT_CONTENT_TYPE = (
+    "INSERT INTO content_types (id, slug, name, description, is_active, is_system, sort_order, created_by)"
+    " VALUES (?, ?, ?, ?, 1, 0, ?, ?)"
+)

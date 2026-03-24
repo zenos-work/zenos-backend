@@ -77,11 +77,12 @@ async def handle_auth(request, env, path: str):
             user_id = str(uuid.uuid4())
             await (
                 env.DB.prepare(
-                    "INSERT INTO users (id, email, name, avatar_url, google_id, role)"
-                    " VALUES (?, ?, ?, ?, ?, ?)"
+                    "INSERT INTO users (id, email, name, avatar_url, google_id, role, terms_accepted_at)"
+                    " VALUES (?, ?, ?, ?, ?, ?, datetime('now'))"
                     " ON CONFLICT(google_id) DO UPDATE SET"
                     " name=excluded.name,"
                     " avatar_url=COALESCE(NULLIF(users.avatar_url, ''), excluded.avatar_url),"
+                    " terms_accepted_at=COALESCE(users.terms_accepted_at, datetime('now')),"
                     " updated_at=datetime('now')"
                 )
                 .bind(

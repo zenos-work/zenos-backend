@@ -77,17 +77,24 @@ http_status() {
   curl -s -o /dev/null -w "%{http_code}" -X "$method" "$url" "${CURL_COMMON_ARGS[@]}" "$@"
 }
 
-# Return first 200 chars of response body (for assertion on content)
-http_body() {
+# Return a short response snippet for readable logs/errors.
+http_body_snippet() {
   local method="$1" url="$2"
   shift 2
   curl -s -X "$method" "$url" "${CURL_COMMON_ARGS[@]}" "$@" | head -c 500
 }
 
+# Return full response body (for strict JSON assertions).
+http_body_full() {
+  local method="$1" url="$2"
+  shift 2
+  curl -s -X "$method" "$url" "${CURL_COMMON_ARGS[@]}" "$@"
+}
+
 print_edge_access_hint() {
   local path="$1"
   local body
-  body=$(http_body GET "$BASE_URL$path")
+  body=$(http_body_snippet GET "$BASE_URL$path")
   echo "  INFO  Received 403 from $path. This usually indicates Cloudflare edge protection (Access/WAF), not app logic."
   if [[ -z "${CF_ACCESS_CLIENT_ID:-}" || -z "${CF_ACCESS_CLIENT_SECRET:-}" ]]; then
     echo "  INFO  Set CF_ACCESS_CLIENT_ID and CF_ACCESS_CLIENT_SECRET in GitHub environment secrets for $SMOKE_ENV."
@@ -244,7 +251,7 @@ fi
 # ---------------------------------------------------------------------------
 header "Tier 3: DB connectivity (response shape)"
 
-BODY=$(http_body GET "$BASE_URL/api/articles")
+BODY=$(http_body_full GET "$BASE_URL/api/articles")
 if echo "$BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); assert isinstance(d,list) or any(k in d for k in ('articles','items','data'))" 2>/dev/null; then
   pass "GET /api/articles → response is valid JSON with expected shape"
 else

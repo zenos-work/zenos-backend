@@ -125,3 +125,57 @@ class AdminRepository(BaseRepository):
 
     async def mark_notifications_read(self, user_id: str) -> None:
         await self.execute(Q.UPDATE_MARK_NOTIFICATIONS_READ, user_id)
+
+    async def list_content_types(self) -> list[dict]:
+        rows = await self.find_all(Q.SELECT_CONTENT_TYPES_ADMIN)
+        return [
+            {
+                "id": row_get(r, "id"),
+                "slug": row_get(r, "slug"),
+                "name": row_get(r, "name"),
+                "description": row_get(r, "description"),
+                "is_active": int(row_get(r, "is_active", 1) or 1),
+                "is_system": int(row_get(r, "is_system", 0) or 0),
+                "sort_order": int(row_get(r, "sort_order", 100) or 100),
+                "created_by": row_get(r, "created_by"),
+                "created_at": row_get(r, "created_at"),
+                "updated_at": row_get(r, "updated_at"),
+            }
+            for r in rows
+        ]
+
+    async def find_content_type_by_slug(self, slug: str) -> Optional[dict]:
+        row = await self.find_one(Q.SELECT_CONTENT_TYPE_BY_SLUG, slug)
+        if not row:
+            return None
+        return {
+            "id": row_get(row, "id"),
+            "slug": row_get(row, "slug"),
+            "name": row_get(row, "name"),
+            "description": row_get(row, "description"),
+            "is_active": int(row_get(row, "is_active", 1) or 1),
+            "is_system": int(row_get(row, "is_system", 0) or 0),
+            "sort_order": int(row_get(row, "sort_order", 100) or 100),
+            "created_by": row_get(row, "created_by"),
+            "created_at": row_get(row, "created_at"),
+            "updated_at": row_get(row, "updated_at"),
+        }
+
+    async def insert_content_type(
+        self,
+        content_type_id: str,
+        slug: str,
+        name: str,
+        description: Optional[str],
+        sort_order: int,
+        created_by: str,
+    ) -> None:
+        await self.execute(
+            Q.INSERT_CONTENT_TYPE,
+            content_type_id,
+            slug,
+            name,
+            description,
+            sort_order,
+            created_by,
+        )

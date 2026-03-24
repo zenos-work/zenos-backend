@@ -5,6 +5,16 @@ import types
 
 import pytest
 
+if "js" in sys.modules and not hasattr(sys.modules["js"], "fetch"):
+    sys.modules["js"].fetch = None
+
+if "js" in sys.modules and not hasattr(sys.modules["js"], "Headers"):
+
+    class _Headers(dict):
+        pass
+
+    sys.modules["js"].Headers = _Headers
+
 from utils.helpers import (
     _json_default,
     _frontend_origin,
@@ -16,6 +26,7 @@ from utils.helpers import (
     slugify,
     unique_slug,
 )
+from utils.context import RequestContext
 
 
 class TestHelpers:
@@ -183,6 +194,34 @@ class TestLogger:
         assert entry.error_msg == "bad value"
         assert entry.error_traceback is not None
         assert entry.error_line is not None
+
+
+class TestRequestContext:
+    def test_request_context_initializes_logger_without_user(
+        self, development_env, simple_request_factory
+    ):
+        req = simple_request_factory(url="https://test.local/api/health")
+        ctx = RequestContext(development_env, req)
+
+        assert isinstance(ctx.trace_id, str)
+        assert ctx.request is req
+        assert ctx.env is development_env
+        assert ctx.log._user_id is None
+        assert ctx.log._user_role is None
+        assert ctx.elapsed_ms >= 0
+
+    def test_request_context_passes_user_identity_to_logger(
+        self, development_env, simple_request_factory
+    ):
+        req = simple_request_factory(url="https://test.local/api/users/me")
+        ctx = RequestContext(
+            development_env,
+            req,
+            user={"sub": "u-123", "role": "AUTHOR"},
+        )
+
+        assert ctx.log._user_id == "u-123"
+        assert ctx.log._user_role == "AUTHOR"
 
 
 class TestIndexRouting:

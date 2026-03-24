@@ -35,6 +35,23 @@ async def handle_admin(request, env, path, method, query, ctx):
         page = int(query.get("page", ["1"])[0])
         return json_resp(await svc.list_users(page))
 
+    # GET /api/admin/content-types — SUPERADMIN
+    if method == "GET" and section == "content-types":
+        if not require_role(user, ["SUPERADMIN"]):
+            return error("Forbidden", 403)
+        return json_resp(await svc.list_content_types())
+
+    # POST /api/admin/content-types — SUPERADMIN
+    if method == "POST" and section == "content-types":
+        if not require_role(user, ["SUPERADMIN"]):
+            return error("Forbidden", 403)
+        try:
+            payload = await request.json()
+            created = await svc.create_content_type(payload, actor_id=user["sub"])
+            return json_resp(created, 201)
+        except ValueError as e:
+            return error(str(e), 422)
+
     # PUT /api/admin/users/:id/ban
     if method == "PUT" and section == "users" and target and action == "ban":
         if not require_role(user, ["SUPERADMIN"]):

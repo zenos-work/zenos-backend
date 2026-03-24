@@ -19,6 +19,14 @@ class ArticleStatus:
     ALL = (DRAFT, SUBMITTED, APPROVED, REJECTED, PUBLISHED, ARCHIVED)
 
 
+class ArticleContentType:
+    ARTICLE = "article"
+    HOW_TO = "how-to"
+    CASE_STUDY = "case-study"
+    RESEARCH = "research"
+    ALL = (ARTICLE, HOW_TO, CASE_STUDY, RESEARCH)
+
+
 class NotificationType:
     LIKE = "LIKE"
     COMMENT = "COMMENT"

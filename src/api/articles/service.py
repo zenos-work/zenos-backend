@@ -4,8 +4,10 @@ from api.articles.moderation import ArticleModerationEngine
 from models.article.model import Article
 from models.article.requests import ArticleCreateRequest, ArticleUpdateRequest
 from models.common.pagination import PaginatedResponse
-from models.common.enums import ArticleStatus, NotificationType
+from models.common.enums import ArticleStatus, NotificationType, ArticleContentType
 from utils.helpers import new_id, unique_slug, calc_read_time
+
+LIFELONG_EXPIRES_AT = "5000-12-31 23:59:00"
 
 
 class ArticleService:
@@ -33,9 +35,13 @@ class ArticleService:
         limit: int,
         tag: Optional[str] = None,
         search: Optional[str] = None,
+        content_type: Optional[str] = None,
     ) -> PaginatedResponse:
         """List published articles with optional tag/search filters."""
-        return await self._repo.find_published(page, limit, tag, search)
+        return await self._repo.find_published(page, limit, tag, search, content_type)
+
+    async def list_content_types(self) -> list[dict]:
+        return await self._repo.list_content_types()
 
     async def list_by_author(
         self,
@@ -58,6 +64,10 @@ class ArticleService:
         req: ArticleCreateRequest,
         author_id: str,
     ) -> Article:
+        content_type = req.content_type or ArticleContentType.ARTICLE
+        if not await self._repo.is_valid_content_type(content_type):
+            raise ValueError(f"Unsupported content_type: {content_type}")
+
         aid = new_id()
         slug = unique_slug(req.title)
         article = await self._repo.insert(
@@ -66,12 +76,13 @@ class ArticleService:
             req.title,
             slug,
             req.subtitle,
+            content_type,
             req.content,
             req.cover_image_url,
             calc_read_time(req.content),
             ArticleStatus.DRAFT,
             req.last_verified_at,
-            req.expires_at,
+            req.expires_at or LIFELONG_EXPIRES_AT,
             req.seo_title,
             req.seo_description,
             req.canonical_url,
@@ -97,6 +108,10 @@ class ArticleService:
         req: ArticleUpdateRequest,
         current: Article,
     ) -> Article:
+        content_type = req.content_type or current.content_type
+        if not await self._repo.is_valid_content_type(content_type):
+            raise ValueError(f"Unsupported content_type: {content_type}")
+
         title = req.title or current.title
         content = req.content or current.content
         article = await self._repo.update(
@@ -104,10 +119,11 @@ class ArticleService:
             title,
             content,
             req.subtitle or current.subtitle,
+            content_type,
             req.cover_image_url or current.cover_image_url,
             calc_read_time(content),
             req.last_verified_at or current.last_verified_at,
-            req.expires_at or current.expires_at,
+            req.expires_at or current.expires_at or LIFELONG_EXPIRES_AT,
             req.seo_title or current.seo_title,
             req.seo_description or current.seo_description,
             req.canonical_url or current.canonical_url,
