@@ -52,7 +52,10 @@ class _Ctx:
             self.calls = []
 
         def debug(self, name, event_data=None):
-            self.calls.append((name, event_data))
+            self.calls.append(("debug", name, event_data))
+
+        def error(self, msg, event_data=None):
+            self.calls.append(("error", msg, event_data))
 
     def __init__(self):
         self.log = self._Log()
