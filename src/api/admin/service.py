@@ -2,6 +2,7 @@ from api.admin.repository import AdminRepository
 from api.users.repository import UserRepository
 from models.common.enums import Scope
 from utils.helpers import new_id, paginate
+import re
 
 
 class AdminService:
@@ -119,3 +120,88 @@ class AdminService:
             comment_id,
             message,
         )
+
+    async def list_content_types(self) -> dict:
+        return {"content_types": await self._repo.list_content_types()}
+
+    async def create_content_type(self, payload: dict, actor_id: str) -> dict:
+        name = str(payload.get("name") or "").strip()
+        if len(name) < 2:
+            raise ValueError("name must be at least 2 characters")
+        if len(name) > 80:
+            raise ValueError("name cannot exceed 80 characters")
+
+        slug_raw = str(payload.get("slug") or name).strip().lower().replace(" ", "-")
+        slug = re.sub(r"[^a-z0-9-]", "", slug_raw)
+        slug = re.sub(r"-+", "-", slug).strip("-")
+        if not re.match(r"^[a-z0-9][a-z0-9-]{1,49}$", slug):
+            raise ValueError(
+                "slug must be lowercase letters/numbers with optional hyphens"
+            )
+
+        existing = await self._repo.find_content_type_by_slug(slug)
+        if existing:
+            raise ValueError(f"content type already exists: {slug}")
+
+        description = payload.get("description")
+        if description is not None:
+            description = str(description).strip()
+            if len(description) > 240:
+                raise ValueError("description cannot exceed 240 characters")
+            if not description:
+                description = None
+
+        current = await self._repo.list_content_types()
+        sort_order = (
+            max((int(ct.get("sort_order", 100) or 100) for ct in current), default=100)
+            + 10
+        )
+
+        content_type_id = new_id()
+        await self._repo.insert_content_type(
+            content_type_id,
+            slug,
+            name,
+            description,
+            sort_order,
+            actor_id,
+        )
+
+        created = await self._repo.find_content_type_by_slug(slug)
+        return {"content_type": created}
+
+    async def list_success_signals(self, page: int = 1, limit: int = 25) -> dict:
+        page = max(1, page)
+        limit = max(1, min(limit, 100))
+        offset = (page - 1) * limit
+
+        snapshots = await self._repo.find_success_signals_hourly(limit, offset)
+        total = await self._repo.count_success_signals_hourly()
+
+        return {
+            "snapshots": snapshots,
+            "pagination": {
+                "page": page,
+                "limit": limit,
+                "total": total,
+                "pages": (total + limit - 1) // limit,
+                "has_more": page * limit < total,
+            },
+        }
+
+    async def list_success_signal_history(
+        self, article_id: str, hours: int = 24
+    ) -> dict:
+        article_id = str(article_id or "").strip()
+        if not article_id:
+            raise ValueError("article_id is required")
+
+        hours = max(1, min(hours, 168))
+        points = await self._repo.find_success_signal_history(article_id, hours)
+        # Return ascending by hour for easier sparkline plotting.
+        points.reverse()
+        return {
+            "article_id": article_id,
+            "hours": hours,
+            "points": points,
+        }

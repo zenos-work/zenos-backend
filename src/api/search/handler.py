@@ -24,6 +24,7 @@ async def handle_search(request, env, path, method, query, ctx):
         pass
 
     status = (query.get("status", ["PUBLISHED"]) or ["PUBLISHED"])[0].strip().upper()
+    content_type = (query.get("content_type", [None]) or [None])[0]
     outcome_tag = (query.get("outcome_tag", [None]) or [None])[0]
     verified_only_raw = (query.get("verified_only", ["false"]) or ["false"])[0]
     verified_only = str(verified_only_raw).strip().lower() in {"1", "true", "yes"}
@@ -35,6 +36,7 @@ async def handle_search(request, env, path, method, query, ctx):
             q,
             page,
             status=status,
+            content_type=content_type,
             outcome_tag=outcome_tag,
             verified_only=verified_only,
         )
@@ -52,6 +54,7 @@ async def handle_search(request, env, path, method, query, ctx):
     result = await svc.search_all(
         q,
         status=status,
+        content_type=content_type,
         outcome_tag=outcome_tag,
         verified_only=verified_only,
     )

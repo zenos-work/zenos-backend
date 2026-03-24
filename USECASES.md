@@ -50,6 +50,13 @@ Each sequence diagram shows the exact class path from user action to response.
    - 8.2 View Approval Queue
    - 8.3 Ban User
    - 8.4 Assign Role
+9. [MVP Coverage](#9-mvp-coverage)
+    - 9.1 MVP1: Publishable Knowledge Platform
+    - 9.2 MVP2: Trust, Compliance, and Moderation
+    - 9.3 MVP3: Discovery and Growth Loops
+10. [Frontend Use Cases](#10-frontend-use-cases)
+    - 10.1 Frontend Use-Case Diagram
+    - 10.2 Frontend Sequence: Create and Publish Flow
 
 ---
 
@@ -847,6 +854,139 @@ sequenceDiagram
     Note over service.py: ADMIN scope includes rejection_note,<br/>approved_by for full context
     service.py-->>handler.py: [{article in ADMIN scope}, ...]
     handler.py-->>Approver: 200 {queue: [...]}
+```
+
+---
+
+## 9. MVP Coverage
+
+This section maps shipped and planned flows to product milestones, so PM, engineering, and QA can verify that each MVP is functionally represented in API and UI paths.
+
+### 9.1 MVP1: Publishable Knowledge Platform
+
+MVP1 focus: authenticated writing, review workflow, publishing, and readable discovery surfaces.
+
+- Authentication and session lifecycle: sections 1.1 to 1.3
+- User onboarding and author enablement: section 2.3
+- Draft to publish lifecycle: sections 3.1 to 3.6
+- Reader discovery and consumption: sections 4.1 and 4.2
+- SR-010 delivered via reader-side heading-derived table of contents
+- SR-011 delivered as hybrid runtime + analytics architecture:
+    - Reader-side signal rendering remains in UI for immediate feedback
+    - Lightweight events captured in backend table `article_events`
+    - Hourly aggregation via scheduled Worker Cron into `article_success_hourly`
+    - Aggregated `engagement_score` and `success_rate` support trend analysis and verification
+- Rich article metadata currently used by frontend:
+    - Dynamic content types via `GET /api/articles/content-types`
+    - In-page table-of-contents rendering from article headings
+
+### 9.2 MVP2: Trust, Compliance, and Moderation
+
+MVP2 focus: governance controls, safer community features, and editorial reliability.
+
+- Approval operations and queue management: sections 3.3, 3.4, and 8.2
+- Comment moderation support and soft deletion: section 5.4
+- Role-aware governance functions: section 8.1
+- Policy and lifecycle support in data model:
+    - Terms acceptance tracking on users
+    - Article moderation and verification metadata
+    - Notification types for moderation outcomes
+
+### 9.3 MVP3: Discovery and Growth Loops
+
+MVP3 focus: sustained engagement through personalisation, social loops, and operational signals.
+
+- Personalised home feed with preference-aware fallback: section 4.1
+- Social actions (likes, follows, bookmarks): section 6
+- Notification-driven feedback loops: notifications table and social/comment events
+- Platform analytics and top-content visibility: section 8.1
+- Superadmin extensibility for content taxonomy:
+    - Runtime content-type management through admin API
+    - Non-breaking frontend filter/write integration for newly added types
+
+---
+
+## 10. Frontend Use Cases
+
+### 10.1 Frontend Use-Case Diagram
+
+```mermaid
+flowchart LR
+        reader[Reader]
+        author[Author]
+        approver[Approver]
+        superadmin[Superadmin]
+
+        subgraph frontend[Frontend Web App]
+                auth[Authenticate with Google]
+                feed[View personalised home feed]
+                read[Read article with TOC]
+                write[Create or edit draft]
+                submit[Submit draft for approval]
+                moderate[Approve or reject article]
+                search[Search and filter by content type]
+                manageTypes[Manage content types]
+        end
+
+        reader --> auth
+        reader --> feed
+        reader --> read
+        reader --> search
+
+        author --> write
+        author --> submit
+        author --> search
+        author --> read
+
+        approver --> moderate
+        approver --> read
+
+        superadmin --> manageTypes
+        superadmin --> moderate
+        superadmin --> search
+```
+
+### 10.2 Frontend Sequence: Create and Publish Flow
+
+```mermaid
+sequenceDiagram
+        actor Author
+        participant Browser as Browser UI
+        participant WritePage as WritePage.tsx
+        participant API as api.ts
+        participant ArticleAPI as /api/articles
+        participant AdminAPI as /api/admin/content-types
+
+        Author->>Browser: Open Write page
+        Browser->>WritePage: Mount component
+        WritePage->>API: getArticleContentTypes()
+        API->>ArticleAPI: GET /api/articles/content-types
+        ArticleAPI-->>API: [article, how-to, case-study, ...]
+        API-->>WritePage: contentTypeOptions
+        WritePage-->>Author: Render dynamic content-type selector
+
+        alt Superadmin adds a new type
+                Author->>WritePage: Enter slug/name and click Add
+                WritePage->>API: createContentType(slug, name, description)
+                API->>AdminAPI: POST /api/admin/content-types
+                AdminAPI-->>API: 201 {content_type}
+                API-->>WritePage: new content type
+                WritePage->>API: getArticleContentTypes()
+                API->>ArticleAPI: GET /api/articles/content-types
+                ArticleAPI-->>WritePage: refreshed list
+        end
+
+        Author->>WritePage: Fill title, content, tags, content_type
+        WritePage->>API: createArticle(payload)
+        API->>ArticleAPI: POST /api/articles
+        ArticleAPI-->>API: 201 {article: DRAFT}
+        API-->>WritePage: created article
+
+        Author->>WritePage: Submit for approval
+        WritePage->>API: submitArticle(articleId)
+        API->>ArticleAPI: POST /api/articles/:id/submit
+        ArticleAPI-->>WritePage: 200 {status: SUBMITTED}
+        WritePage-->>Author: Show success and transition state
 ```
 
 ---

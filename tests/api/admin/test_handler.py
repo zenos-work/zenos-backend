@@ -13,6 +13,17 @@ class _Req:
         self.headers = {}
 
 
+class _ReqJson(_Req):
+    """Request stub with a JSON body (for POST tests)."""
+
+    def __init__(self, method, path, body):
+        super().__init__(method, path)
+        self._body = body
+
+    async def json(self):
+        return self._body
+
+
 class _Env:
     DB = None
 
@@ -49,6 +60,25 @@ class _Svc:
 
     async def mark_notifications_read(self, user_id):
         self.calls.append(("mark_notifications_read", user_id))
+
+    async def list_content_types(self):
+        self.calls.append("list_content_types")
+        return {"content_types": [{"slug": "article", "name": "Article"}]}
+
+    async def create_content_type(self, payload, actor_id):
+        self.calls.append(("create_content_type", payload))
+        return {"content_type": {"slug": "deep-dive", "name": payload.get("name", "")}}
+
+    async def list_success_signals(self, page, limit):
+        self.calls.append(("list_success_signals", page, limit))
+        return {
+            "snapshots": [],
+            "pagination": {"page": page, "limit": limit, "total": 0},
+        }
+
+    async def list_success_signal_history(self, article_id, hours):
+        self.calls.append(("list_success_signal_history", article_id, hours))
+        return {"article_id": article_id, "hours": hours, "points": []}
 
 
 @pytest.fixture
@@ -217,3 +247,180 @@ class TestAdminHandler:
         )
 
         assert resp.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_content_types_get_forbidden_without_superadmin(
+        self, monkeypatch, svc
+    ):
+        async def _user(_request, _env):
+            return {"sub": "u1", "role": "AUTHOR"}
+
+        monkeypatch.setattr(admin_handler, "get_user", _user)
+        monkeypatch.setattr(admin_handler, "require_role", lambda user, allowed: False)
+
+        resp = await admin_handler.handle_admin(
+            _Req("GET", "/api/admin/content-types"),
+            _Env(),
+            "/api/admin/content-types",
+            "GET",
+            {},
+            _Ctx(),
+        )
+
+        assert resp.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_content_types_get_success(self, monkeypatch, svc, allow_all):
+        async def _user(_request, _env):
+            return {"sub": "u1", "role": "SUPERADMIN"}
+
+        monkeypatch.setattr(admin_handler, "get_user", _user)
+
+        resp = await admin_handler.handle_admin(
+            _Req("GET", "/api/admin/content-types"),
+            _Env(),
+            "/api/admin/content-types",
+            "GET",
+            {},
+            _Ctx(),
+        )
+
+        assert resp.status_code == 200
+        assert "list_content_types" in svc.calls
+
+    @pytest.mark.asyncio
+    async def test_content_types_post_success(self, monkeypatch, svc, allow_all):
+        async def _user(_request, _env):
+            return {"sub": "u1", "role": "SUPERADMIN"}
+
+        monkeypatch.setattr(admin_handler, "get_user", _user)
+
+        req = _ReqJson("POST", "/api/admin/content-types", {"name": "Deep Dive"})
+        resp = await admin_handler.handle_admin(
+            req,
+            _Env(),
+            "/api/admin/content-types",
+            "POST",
+            {},
+            _Ctx(),
+        )
+
+        assert resp.status_code == 201
+        assert any("create_content_type" in str(c) for c in svc.calls)
+
+    @pytest.mark.asyncio
+    async def test_content_types_post_validation_error(self, monkeypatch):
+        async def _user(_request, _env):
+            return {"sub": "u1", "role": "SUPERADMIN"}
+
+        monkeypatch.setattr(admin_handler, "get_user", _user)
+        monkeypatch.setattr(admin_handler, "require_role", lambda u, a: True)
+
+        class _SvcRaisesValue:
+            async def create_content_type(self, payload, actor_id):
+                raise ValueError("name must be at least 2 characters")
+
+        monkeypatch.setattr(
+            admin_handler, "AdminService", lambda env, ctx: _SvcRaisesValue()
+        )
+
+        req = _ReqJson("POST", "/api/admin/content-types", {"name": "x"})
+        resp = await admin_handler.handle_admin(
+            req,
+            _Env(),
+            "/api/admin/content-types",
+            "POST",
+            {},
+            _Ctx(),
+        )
+
+        assert resp.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_success_signals_get_forbidden_without_superadmin(
+        self, monkeypatch, svc
+    ):
+        async def _user(_request, _env):
+            return {"sub": "u1", "role": "AUTHOR"}
+
+        monkeypatch.setattr(admin_handler, "get_user", _user)
+        monkeypatch.setattr(admin_handler, "require_role", lambda user, allowed: False)
+
+        resp = await admin_handler.handle_admin(
+            _Req("GET", "/api/admin/success-signals"),
+            _Env(),
+            "/api/admin/success-signals",
+            "GET",
+            {},
+            _Ctx(),
+        )
+
+        assert resp.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_success_signals_get_success(self, monkeypatch, svc, allow_all):
+        async def _user(_request, _env):
+            return {"sub": "u1", "role": "SUPERADMIN"}
+
+        monkeypatch.setattr(admin_handler, "get_user", _user)
+
+        resp = await admin_handler.handle_admin(
+            _Req("GET", "/api/admin/success-signals?page=2&limit=10"),
+            _Env(),
+            "/api/admin/success-signals",
+            "GET",
+            {"page": ["2"], "limit": ["10"]},
+            _Ctx(),
+        )
+
+        assert resp.status_code == 200
+        assert ("list_success_signals", 2, 10) in svc.calls
+
+    @pytest.mark.asyncio
+    async def test_success_signals_history_get_success(
+        self, monkeypatch, svc, allow_all
+    ):
+        async def _user(_request, _env):
+            return {"sub": "u1", "role": "SUPERADMIN"}
+
+        monkeypatch.setattr(admin_handler, "get_user", _user)
+
+        resp = await admin_handler.handle_admin(
+            _Req("GET", "/api/admin/success-signals/history?article_id=a1&hours=12"),
+            _Env(),
+            "/api/admin/success-signals/history",
+            "GET",
+            {"article_id": ["a1"], "hours": ["12"]},
+            _Ctx(),
+        )
+
+        assert resp.status_code == 200
+        assert ("list_success_signal_history", "a1", 12) in svc.calls
+
+    @pytest.mark.asyncio
+    async def test_success_signals_history_validation_error(
+        self, monkeypatch, allow_all
+    ):
+        async def _user(_request, _env):
+            return {"sub": "u1", "role": "SUPERADMIN"}
+
+        monkeypatch.setattr(admin_handler, "get_user", _user)
+
+        class _SvcInvalid:
+            async def list_success_signal_history(self, article_id, hours):
+                raise ValueError("article_id is required")
+
+        monkeypatch.setattr(
+            admin_handler, "AdminService", lambda env, ctx: _SvcInvalid()
+        )
+
+        resp = await admin_handler.handle_admin(
+            _Req("GET", "/api/admin/success-signals/history"),
+            _Env(),
+            "/api/admin/success-signals/history",
+            "GET",
+            {},
+            _Ctx(),
+        )
+
+        assert resp.status_code == 422

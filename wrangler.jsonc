@@ -4,6 +4,10 @@
   "compatibility_date": "2024-12-01",
   "compatibility_flags": ["python_workers"],
 
+  "triggers": {
+    "crons": ["0 * * * *"]
+  },
+
   "vars": {
     "ENVIRONMENT": "production",
     "FRONTEND_URL": "https://zenos.work"

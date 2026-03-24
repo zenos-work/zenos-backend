@@ -4,6 +4,8 @@ from api.articles import queries as Q
 from models.article.model import Article
 from models.tag.model import Tag
 from models.common.pagination import PaginatedResponse
+from models.common.enums import ArticleContentType
+from models.base import row_get
 
 
 class ArticleRepository(BaseRepository):
@@ -21,6 +23,7 @@ class ArticleRepository(BaseRepository):
         limit: int,
         tag: Optional[str] = None,
         search: Optional[str] = None,
+        content_type: Optional[str] = None,
     ) -> PaginatedResponse:
         offset = (page - 1) * limit
         if tag:
@@ -28,6 +31,8 @@ class ArticleRepository(BaseRepository):
                 Q.SELECT_PUBLISHED_BY_TAG,
                 "PUBLISHED",
                 tag,
+                content_type,
+                content_type,
                 limit,
                 offset,
             )
@@ -35,6 +40,8 @@ class ArticleRepository(BaseRepository):
             rows = await self.find_all(
                 Q.SELECT_PUBLISHED_SEARCH,
                 "PUBLISHED",
+                content_type,
+                content_type,
                 f"%{search}%",
                 f"%{search}%",
                 limit,
@@ -44,6 +51,8 @@ class ArticleRepository(BaseRepository):
             rows = await self.find_all(
                 Q.SELECT_PUBLISHED_LIST,
                 "PUBLISHED",
+                content_type,
+                content_type,
                 limit,
                 offset,
             )
@@ -86,10 +95,35 @@ class ArticleRepository(BaseRepository):
         return PaginatedResponse.of(articles, page, limit)
 
     async def find_author_id(self, article_id: str) -> Optional[str]:
-        from models.base import row_get
-
         row = await self.find_one(Q.SELECT_AUTHOR_ID_BY_ID, article_id)
         return row_get(row, "author_id") if row else None
+
+    async def list_content_types(self) -> list[dict]:
+        try:
+            rows = await self.find_all(Q.SELECT_CONTENT_TYPES_PUBLIC)
+            return [
+                {
+                    "slug": row_get(r, "slug"),
+                    "name": row_get(r, "name") or row_get(r, "slug"),
+                }
+                for r in rows
+                if row_get(r, "slug")
+            ]
+        except Exception:
+            return [
+                {
+                    "slug": slug,
+                    "name": slug.replace("-", " ").title(),
+                }
+                for slug in ArticleContentType.ALL
+            ]
+
+    async def is_valid_content_type(self, content_type: str) -> bool:
+        try:
+            row = await self.find_one(Q.SELECT_CONTENT_TYPE_EXISTS, content_type)
+            return bool(row)
+        except Exception:
+            return content_type in ArticleContentType.ALL
 
     async def find_status_row(self, article_id: str):
         """Returns raw row with id, author_id, status — for transition checks."""
@@ -115,6 +149,7 @@ class ArticleRepository(BaseRepository):
         title: str,
         slug: str,
         subtitle: Optional[str],
+        content_type: Optional[str],
         content: str,
         cover_image_url: Optional[str],
         read_time: int,
@@ -134,6 +169,7 @@ class ArticleRepository(BaseRepository):
             title,
             slug,
             self._optional_text(subtitle),
+            self._optional_text(content_type or "article"),
             content,
             self._optional_text(cover_image_url),
             read_time,
@@ -157,6 +193,7 @@ class ArticleRepository(BaseRepository):
         title: str,
         content: str,
         subtitle: Optional[str],
+        content_type: Optional[str],
         cover_image_url: Optional[str],
         read_time: int,
         last_verified_at: Optional[str],
@@ -172,6 +209,7 @@ class ArticleRepository(BaseRepository):
             title,
             content,
             self._optional_text(subtitle),
+            self._optional_text(content_type or "article"),
             self._optional_text(cover_image_url),
             read_time,
             self._optional_text(last_verified_at),

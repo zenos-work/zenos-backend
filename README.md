@@ -8,6 +8,7 @@ platform written in Python. It provides:
 * Admin functions (user management, content moderation)
 * Media storage (R2 for avatars, images)
 * Session management (KV for refresh tokens)
+* SR-011 success-signal analytics (event capture + hourly aggregation)
 
 ## Overview
 
@@ -166,6 +167,32 @@ added under `docs/` or inline as needed.
   introduce a proper routing library and separate controllers.
 * All database interactions are asynchronous and use simple SQL strings;
   consider using an ORM if complexity grows.
+
+## SR-011 Success Signals (Architecture)
+
+SR-011 now runs on a two-layer model:
+
+- Read-time UX signals in frontend (verification freshness, traction, outcome evidence)
+- Backend analytics pipeline for durable hourly scoring
+
+Backend pipeline details:
+
+- Event capture table: `article_events`
+- Hourly aggregate table: `article_success_hourly`
+- Runtime event writes occur on:
+  - Article views (`VIEW`)
+  - Likes (`LIKE`)
+  - Comment creation (`COMMENT`)
+- Scheduled worker aggregation:
+  - Worker entrypoint implements `on_scheduled`
+  - Cron configured in [wrangler.jsonc](wrangler.jsonc) with `0 * * * *`
+  - Aggregation computes per-article hourly counts and derived `success_rate`
+
+To test scheduled execution locally:
+
+```sh
+curl "http://localhost:8787/cdn-cgi/handler/scheduled"
+```
 
 ---
 

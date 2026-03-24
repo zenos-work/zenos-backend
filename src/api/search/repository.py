@@ -23,6 +23,7 @@ class SearchRepository(BaseRepository):
         limit: int,
         offset: int,
         status: str = "PUBLISHED",
+        content_type: str = None,
         outcome_tag: str = None,
         verified_only: bool = False,
     ) -> list:
@@ -31,6 +32,8 @@ class SearchRepository(BaseRepository):
             fts_query,
             status,
             status,
+            content_type,
+            content_type,
             1 if verified_only else 0,
             outcome_tag,
             outcome_tag,
@@ -43,6 +46,7 @@ class SearchRepository(BaseRepository):
         self,
         fts_query: str,
         status: str = "PUBLISHED",
+        content_type: str = None,
         outcome_tag: str = None,
         verified_only: bool = False,
     ) -> int:
@@ -51,6 +55,8 @@ class SearchRepository(BaseRepository):
             fts_query,
             status,
             status,
+            content_type,
+            content_type,
             1 if verified_only else 0,
             outcome_tag,
             outcome_tag,

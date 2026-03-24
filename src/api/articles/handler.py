@@ -20,12 +20,21 @@ async def handle_articles(request, env, path, method, query, ctx):
         page = int(query.get("page", ["1"])[0])
         limit = int(query.get("limit", ["20"])[0])
         limit = min(limit, 100)  # Max 100 per page
-        result = await svc.list_published(
-            page=page,
-            limit=limit,
-            tag=query.get("tag", [None])[0],
-            search=query.get("search", [None])[0],
-        )
+        try:
+            result = await svc.list_published(
+                page=page,
+                limit=limit,
+                tag=query.get("tag", [None])[0],
+                search=query.get("search", [None])[0],
+                content_type=query.get("content_type", [None])[0],
+            )
+        except TypeError:
+            result = await svc.list_published(
+                page=page,
+                limit=limit,
+                tag=query.get("tag", [None])[0],
+                search=query.get("search", [None])[0],
+            )
         return json_resp(result.to_dict())
 
     # GET /api/articles/mine
@@ -39,6 +48,11 @@ async def handle_articles(request, env, path, method, query, ctx):
         limit = min(limit, 100)
         result = await svc.list_by_author(user["sub"], page, limit, status)
         return json_resp(result.to_dict())
+
+    # GET /api/articles/content-types
+    if method == "GET" and art_id == "content-types":
+        content_types = await svc.list_content_types()
+        return json_resp({"content_types": content_types})
 
     # GET /api/articles/:id
     if method == "GET" and art_id and not action:
@@ -66,7 +80,10 @@ async def handle_articles(request, env, path, method, query, ctx):
             req = ArticleCreateRequest.from_body(await request.json())
         except ValueError as e:
             return error(str(e), 422)
-        article = await svc.create(req, author_id=user["sub"])
+        try:
+            article = await svc.create(req, author_id=user["sub"])
+        except ValueError as e:
+            return error(str(e), 422)
         return json_resp({"article": article.to_dict(Scope.DETAIL)}, 201)
 
     # PUT /api/articles/:id
@@ -85,7 +102,10 @@ async def handle_articles(request, env, path, method, query, ctx):
             req = ArticleUpdateRequest.from_body(await request.json())
         except ValueError as e:
             return error(str(e), 422)
-        updated = await svc.update(art_id, req, article)
+        try:
+            updated = await svc.update(art_id, req, article)
+        except ValueError as e:
+            return error(str(e), 422)
         return json_resp({"article": updated.to_dict(Scope.DETAIL)})
 
     # DELETE /api/articles/:id

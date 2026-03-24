@@ -81,3 +81,41 @@ INSERT_NOTIFICATION = (
 UPDATE_MARK_NOTIFICATIONS_READ = (
     "UPDATE notifications SET is_read = 1" " WHERE user_id = ? AND is_read = 0"
 )
+
+SELECT_CONTENT_TYPES_ADMIN = (
+    "SELECT id, slug, name, description, is_active, is_system, sort_order, created_by, created_at, updated_at"
+    " FROM content_types"
+    " ORDER BY sort_order ASC, name ASC"
+)
+
+SELECT_CONTENT_TYPE_BY_SLUG = (
+    "SELECT id, slug, name, description, is_active, is_system, sort_order, created_by, created_at, updated_at"
+    " FROM content_types"
+    " WHERE slug = ?"
+    " LIMIT 1"
+)
+
+INSERT_CONTENT_TYPE = (
+    "INSERT INTO content_types (id, slug, name, description, is_active, is_system, sort_order, created_by)"
+    " VALUES (?, ?, ?, ?, 1, 0, ?, ?)"
+)
+
+SELECT_SUCCESS_SIGNALS_HOURLY = (
+    "SELECT s.article_id, a.slug, a.title, s.bucket_hour,"
+    " s.views_count, s.likes_count, s.comments_count, s.outcome_events_count,"
+    " s.outcome_tag_count, s.engagement_score, s.success_rate, s.updated_at"
+    " FROM article_success_hourly s"
+    " JOIN articles a ON a.id = s.article_id"
+    " ORDER BY s.bucket_hour DESC, s.success_rate DESC"
+    " LIMIT ? OFFSET ?"
+)
+
+COUNT_SUCCESS_SIGNALS_HOURLY = "SELECT COUNT(*) AS c FROM article_success_hourly"
+
+SELECT_SUCCESS_SIGNAL_HISTORY_BY_ARTICLE = (
+    "SELECT bucket_hour, success_rate, engagement_score"
+    " FROM article_success_hourly"
+    " WHERE article_id = ?"
+    " ORDER BY bucket_hour DESC"
+    " LIMIT ?"
+)

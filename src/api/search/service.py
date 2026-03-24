@@ -53,6 +53,7 @@ class SearchService:
         q: str,
         page: int = 1,
         status: str = "PUBLISHED",
+        content_type: str = None,
         outcome_tag: str = None,
         verified_only: bool = False,
     ) -> PaginatedResponse:
@@ -67,12 +68,14 @@ class SearchService:
                 limit,
                 offset,
                 status=status,
+                content_type=content_type,
                 outcome_tag=outcome_tag,
                 verified_only=verified_only,
             )
             total = await self._repo.count_articles(
                 fts,
                 status=status,
+                content_type=content_type,
                 outcome_tag=outcome_tag,
                 verified_only=verified_only,
             )
@@ -104,6 +107,7 @@ class SearchService:
         self,
         q: str,
         status: str = "PUBLISHED",
+        content_type: str = None,
         outcome_tag: str = None,
         verified_only: bool = False,
     ) -> dict:
@@ -117,12 +121,14 @@ class SearchService:
                     _ALL_ARTICLES_LIMIT,
                     0,
                     status=status,
+                    content_type=content_type,
                     outcome_tag=outcome_tag,
                     verified_only=verified_only,
                 )
                 articles_total = await self._repo.count_articles(
                     fts,
                     status=status,
+                    content_type=content_type,
                     outcome_tag=outcome_tag,
                     verified_only=verified_only,
                 )

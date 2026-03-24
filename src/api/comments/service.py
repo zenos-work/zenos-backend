@@ -1,6 +1,7 @@
 from typing import Optional
 from api.comments.repository import CommentRepository
 from api.articles.repository import ArticleRepository
+from api.analytics.service import AnalyticsService
 from models.comment.model import Comment
 from models.comment.requests import (
     CommentCreateRequest,
@@ -17,6 +18,7 @@ class CommentService:
     def __init__(self, env, ctx=None):
         self._repo = CommentRepository(env.DB, ctx)
         self._article_repo = ArticleRepository(env.DB, ctx)
+        self._analytics_service = AnalyticsService(env, ctx)
         self._ctx = ctx
 
     async def _log(self, name: str, data: dict = None) -> None:
@@ -96,6 +98,15 @@ class CommentService:
             cid, req.article_id, author_id, req.parent_id, req.content
         )
         await self._article_repo.increment_comments(req.article_id)
+        try:
+            await self._analytics_service.record_article_event(
+                article_id=req.article_id,
+                event_type="COMMENT",
+                actor_user_id=author_id,
+                event_source="api",
+            )
+        except Exception:
+            pass
         await self._log(
             "comment.created",
             {

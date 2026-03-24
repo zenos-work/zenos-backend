@@ -264,11 +264,13 @@ class TestArticleCreateRequest:
                 "title": "Full Article",
                 "content": "B" * 100,
                 "subtitle": "A short sub",
+                "content_type": "case-study",
                 "cover_image_url": "https://example.com/img.jpg",
                 "tag_ids": ["t1", "t2"],
             }
         )
         assert req.subtitle == "A short sub"
+        assert req.content_type == "case-study"
         assert len(req.tag_ids) == 2
 
     def test_title_required(self):
@@ -329,6 +331,19 @@ class TestArticleCreateRequest:
                 }
             )
 
+    def test_content_type_must_be_slug_like(self):
+        with pytest.raises(
+            ValueError,
+            match="content_type must be lowercase letters/numbers with optional hyphens",
+        ):
+            ArticleCreateRequest.from_body(
+                {
+                    "title": "Good Title",
+                    "content": "A" * 60,
+                    "content_type": "Memo Type",
+                }
+            )
+
 
 class TestArticleUpdateRequest:
     def test_all_fields_optional(self):
@@ -348,6 +363,13 @@ class TestArticleUpdateRequest:
         req = ArticleUpdateRequest.from_body({"title": "New Good Title"})
         assert req.title == "New Good Title"
         assert req.content is None
+
+    def test_invalid_content_type_when_provided(self):
+        with pytest.raises(
+            ValueError,
+            match="content_type must be lowercase letters/numbers with optional hyphens",
+        ):
+            ArticleUpdateRequest.from_body({"content_type": "Memo Type"})
 
 
 class TestRejectArticleRequest:

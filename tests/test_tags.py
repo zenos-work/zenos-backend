@@ -89,7 +89,20 @@ class FakeTagService:
     def __init__(self, env, ctx=None):
         self.tags = {
             "t1": Tag(id="t1", name="Fintech", slug="fintech", article_count=3),
-            "python": Tag(id="t2", name="Python", slug="python", article_count=7),
+            "python": Tag(
+                id="t2",
+                name="Python",
+                slug="python",
+                category_slug="programming",
+                article_count=7,
+            ),
+            "programming": Tag(
+                id="t3",
+                name="Programming",
+                slug="programming",
+                is_onboarding_category=1,
+                article_count=0,
+            ),
         }
 
     async def list_all(self):
@@ -108,10 +121,19 @@ class FakeTagService:
             id="new-tag-id",
             name=req.name,
             slug=req.name.strip().lower().replace(" ", "-"),
+            category_slug=req.category_slug,
+            is_onboarding_category=req.is_onboarding_category,
             article_count=0,
         )
         self.tags[tag.slug] = tag
         return tag
+
+    async def list_onboarding(self):
+        return [
+            t
+            for t in self.tags.values()
+            if t.is_onboarding_category or bool(t.category_slug)
+        ]
 
 
 class TagsClient:
@@ -187,6 +209,17 @@ class TestTagCreateRequest:
         req = TagCreateRequest.from_body({"name": " #FinOps "})
         assert req.name == "FinOps"
 
+    def test_optional_onboarding_fields(self):
+        req = TagCreateRequest.from_body(
+            {
+                "name": "Technology",
+                "category_slug": "Technology",
+                "is_onboarding_category": True,
+            }
+        )
+        assert req.category_slug == "technology"
+        assert req.is_onboarding_category == 1
+
 
 class TestTagModel:
     def test_from_row_maps_fields(self):
@@ -200,6 +233,19 @@ class TestTagModel:
     def test_from_row_default_article_count(self):
         tag = Tag.from_row({"id": "t8", "name": "Cloud", "slug": "cloud"})
         assert tag.article_count == 0
+
+    def test_from_row_maps_onboarding_fields(self):
+        tag = Tag.from_row(
+            {
+                "id": "t7",
+                "name": "Technology",
+                "slug": "technology",
+                "category_slug": None,
+                "is_onboarding_category": 1,
+                "article_count": 0,
+            }
+        )
+        assert tag.is_onboarding_category == 1
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -237,6 +283,14 @@ class TestTagsEndpoints:
         data = r.json()
         assert "tags" in data
         assert len(data["tags"]) >= 2
+
+    def test_list_onboarding_tags(self, client):
+        r = client.get("/api/tags?onboarding=1")
+        assert r.status_code == 200
+        data = r.json()
+        assert "tags" in data
+        assert any(tag["slug"] == "programming" for tag in data["tags"])
+        assert any(tag["slug"] == "python" for tag in data["tags"])
 
     def test_get_tag_by_slug(self, client):
         r = client.get("/api/tags/python")

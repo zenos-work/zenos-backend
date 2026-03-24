@@ -1,7 +1,9 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional, List
+import re
 from models.base import BaseRequest
+from models.common.enums import ArticleContentType
 
 
 def _normalize_optional_text(value) -> Optional[str]:
@@ -23,6 +25,16 @@ def _normalize_optional_datetime(value, field_name: str) -> Optional[str]:
     return parsed.strftime("%Y-%m-%d %H:%M:%S")
 
 
+def _validate_content_type_slug(value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return None
+    if not re.match(r"^[a-z0-9][a-z0-9-]{1,49}$", value):
+        raise ValueError(
+            "content_type must be lowercase letters/numbers with optional hyphens"
+        )
+    return value
+
+
 @dataclass
 class ArticleCreateRequest(BaseRequest):
     """Create a new article (DRAFT status by default)."""
@@ -30,6 +42,7 @@ class ArticleCreateRequest(BaseRequest):
     title: str
     content: str
     subtitle: Optional[str] = None
+    content_type: Optional[str] = None
     cover_image_url: Optional[str] = None
     last_verified_at: Optional[str] = None
     expires_at: Optional[str] = None
@@ -64,6 +77,10 @@ class ArticleCreateRequest(BaseRequest):
         if subtitle:
             if len(subtitle) > 500:
                 raise ValueError("Subtitle cannot be longer than 500 characters")
+
+        content_type = _validate_content_type_slug(
+            _normalize_optional_text(data.get("content_type"))
+        )
 
         cover_image_url = _normalize_optional_text(data.get("cover_image_url"))
 
@@ -106,6 +123,7 @@ class ArticleCreateRequest(BaseRequest):
             title=title,
             content=content,
             subtitle=subtitle if subtitle else None,
+            content_type=content_type or ArticleContentType.ARTICLE,
             cover_image_url=cover_image_url,
             last_verified_at=last_verified_at,
             expires_at=expires_at,
@@ -125,6 +143,7 @@ class ArticleUpdateRequest(BaseRequest):
     title: Optional[str] = None
     content: Optional[str] = None
     subtitle: Optional[str] = None
+    content_type: Optional[str] = None
     cover_image_url: Optional[str] = None
     last_verified_at: Optional[str] = None
     expires_at: Optional[str] = None
@@ -158,6 +177,10 @@ class ArticleUpdateRequest(BaseRequest):
         if subtitle is not None:
             if len(subtitle) > 500:
                 raise ValueError("Subtitle cannot be longer than 500 characters")
+
+        content_type = _validate_content_type_slug(
+            _normalize_optional_text(data.get("content_type"))
+        )
 
         cover_image_url = _normalize_optional_text(data.get("cover_image_url"))
 
@@ -201,6 +224,7 @@ class ArticleUpdateRequest(BaseRequest):
             title=title,
             content=content,
             subtitle=subtitle,
+            content_type=content_type,
             cover_image_url=cover_image_url,
             last_verified_at=last_verified_at,
             expires_at=expires_at,

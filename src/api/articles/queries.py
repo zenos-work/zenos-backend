@@ -8,18 +8,20 @@ SELECT_BASE = (
 )
 
 SELECT_PUBLISHED_LIST = (
-    SELECT_BASE + " WHERE a.status = ?" " ORDER BY a.published_at DESC LIMIT ? OFFSET ?"
+    SELECT_BASE + " WHERE a.status = ? AND (? IS NULL OR a.content_type = ?)"
+    " ORDER BY a.published_at DESC LIMIT ? OFFSET ?"
 )
 
 SELECT_PUBLISHED_BY_TAG = (
     SELECT_BASE + " JOIN article_tags at ON a.id = at.article_id"
     " JOIN tags t ON at.tag_id = t.id"
-    " WHERE a.status = ? AND t.slug = ?"
+    " WHERE a.status = ? AND t.slug = ? AND (? IS NULL OR a.content_type = ?)"
     " ORDER BY a.published_at DESC LIMIT ? OFFSET ?"
 )
 
 SELECT_PUBLISHED_SEARCH = (
     SELECT_BASE + " WHERE a.status = ?"
+    " AND (? IS NULL OR a.content_type = ?)"
     " AND (a.title LIKE ? OR a.subtitle LIKE ?)"
     " ORDER BY a.published_at DESC LIMIT ? OFFSET ?"
 )
@@ -48,15 +50,15 @@ SELECT_TAGS_FOR_ARTICLE = (
 
 INSERT_ARTICLE = (
     "INSERT INTO articles"
-    " (id, author_id, title, slug, subtitle, content,"
+    " (id, author_id, title, slug, subtitle, content_type, content,"
     "  cover_image_url, read_time_minutes, status,"
     "  last_verified_at, expires_at, seo_title, seo_description, canonical_url, og_image_url, seo_schema_type)"
-    " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
 )
 
 UPDATE_ARTICLE = (
     "UPDATE articles"
-    " SET title = ?, content = ?, subtitle = ?,"
+    " SET title = ?, content = ?, subtitle = ?, content_type = ?,"
     "     cover_image_url = ?, read_time_minutes = ?,"
     "     last_verified_at = ?, expires_at = ?,"
     "     seo_title = ?, seo_description = ?, canonical_url = ?, og_image_url = ?, seo_schema_type = ?,"
@@ -125,4 +127,18 @@ INSERT_NOTIFICATION = (
     "INSERT INTO notifications"
     " (id, user_id, actor_id, type, article_id, comment_id, message)"
     " VALUES (?, ?, ?, ?, ?, ?, ?)"
+)
+
+SELECT_CONTENT_TYPES_PUBLIC = (
+    "SELECT slug, name"
+    " FROM content_types"
+    " WHERE is_active = 1"
+    " ORDER BY sort_order ASC, name ASC"
+)
+
+SELECT_CONTENT_TYPE_EXISTS = (
+    "SELECT 1 AS ok"
+    " FROM content_types"
+    " WHERE slug = ? AND is_active = 1"
+    " LIMIT 1"
 )

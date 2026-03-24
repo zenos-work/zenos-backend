@@ -9,6 +9,7 @@ _LIST_FIELDS = {
     "title",
     "slug",
     "subtitle",
+    "content_type",
     "status",
     "author_id",
     "cover_image_url",
@@ -57,6 +58,7 @@ class Article(BaseModel):
     content: str = ""
     updated_at: str = ""
     subtitle: Optional[str] = None
+    content_type: str = "article"
     cover_image_url: Optional[str] = None
     published_at: Optional[str] = None
     rejection_note: Optional[str] = None
@@ -116,6 +118,7 @@ class Article(BaseModel):
             content=row_get(row, "content", ""),
             updated_at=row_get(row, "updated_at", ""),
             subtitle=row_get(row, "subtitle"),
+            content_type=row_get(row, "content_type", "article"),
             cover_image_url=row_get(row, "cover_image_url"),
             published_at=row_get(row, "published_at"),
             rejection_note=row_get(row, "rejection_note"),

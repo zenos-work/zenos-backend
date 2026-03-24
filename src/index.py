@@ -14,6 +14,7 @@ from api.feed.handler import handle_feed
 from api.media.handler import handle_media
 from api.admin.handler import handle_admin
 from api.search.handler import handle_search
+from api.analytics.service import AnalyticsService
 
 from js import Response
 
@@ -21,6 +22,15 @@ from js import Response
 class Default(WorkerEntrypoint):
     async def on_fetch(self, request):
         return await with_logging(request, self.env, self._dispatch)
+
+    async def scheduled(self, _controller, env, _ctx):
+        service = AnalyticsService(env or self.env)
+        try:
+            result = await service.aggregate_previous_hour()
+            print(f"[sr011] hourly aggregation complete: {result}")
+        except Exception as exc:
+            print(f"[sr011] hourly aggregation failed: {exc}")
+            raise
 
     async def _dispatch(self, ctx):
         """Pure routing — no business logic here."""

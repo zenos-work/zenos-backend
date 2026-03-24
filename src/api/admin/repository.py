@@ -125,3 +125,98 @@ class AdminRepository(BaseRepository):
 
     async def mark_notifications_read(self, user_id: str) -> None:
         await self.execute(Q.UPDATE_MARK_NOTIFICATIONS_READ, user_id)
+
+    async def list_content_types(self) -> list[dict]:
+        rows = await self.find_all(Q.SELECT_CONTENT_TYPES_ADMIN)
+        return [
+            {
+                "id": row_get(r, "id"),
+                "slug": row_get(r, "slug"),
+                "name": row_get(r, "name"),
+                "description": row_get(r, "description"),
+                "is_active": int(row_get(r, "is_active", 1) or 1),
+                "is_system": int(row_get(r, "is_system", 0) or 0),
+                "sort_order": int(row_get(r, "sort_order", 100) or 100),
+                "created_by": row_get(r, "created_by"),
+                "created_at": row_get(r, "created_at"),
+                "updated_at": row_get(r, "updated_at"),
+            }
+            for r in rows
+        ]
+
+    async def find_content_type_by_slug(self, slug: str) -> Optional[dict]:
+        row = await self.find_one(Q.SELECT_CONTENT_TYPE_BY_SLUG, slug)
+        if not row:
+            return None
+        return {
+            "id": row_get(row, "id"),
+            "slug": row_get(row, "slug"),
+            "name": row_get(row, "name"),
+            "description": row_get(row, "description"),
+            "is_active": int(row_get(row, "is_active", 1) or 1),
+            "is_system": int(row_get(row, "is_system", 0) or 0),
+            "sort_order": int(row_get(row, "sort_order", 100) or 100),
+            "created_by": row_get(row, "created_by"),
+            "created_at": row_get(row, "created_at"),
+            "updated_at": row_get(row, "updated_at"),
+        }
+
+    async def insert_content_type(
+        self,
+        content_type_id: str,
+        slug: str,
+        name: str,
+        description: Optional[str],
+        sort_order: int,
+        created_by: str,
+    ) -> None:
+        await self.execute(
+            Q.INSERT_CONTENT_TYPE,
+            content_type_id,
+            slug,
+            name,
+            description,
+            sort_order,
+            created_by,
+        )
+
+    async def find_success_signals_hourly(self, limit: int, offset: int) -> list[dict]:
+        rows = await self.find_all(Q.SELECT_SUCCESS_SIGNALS_HOURLY, limit, offset)
+        return [
+            {
+                "article_id": row_get(r, "article_id"),
+                "slug": row_get(r, "slug"),
+                "title": row_get(r, "title"),
+                "bucket_hour": row_get(r, "bucket_hour"),
+                "views_count": int(row_get(r, "views_count", 0) or 0),
+                "likes_count": int(row_get(r, "likes_count", 0) or 0),
+                "comments_count": int(row_get(r, "comments_count", 0) or 0),
+                "outcome_events_count": int(row_get(r, "outcome_events_count", 0) or 0),
+                "outcome_tag_count": int(row_get(r, "outcome_tag_count", 0) or 0),
+                "engagement_score": float(row_get(r, "engagement_score", 0) or 0),
+                "success_rate": float(row_get(r, "success_rate", 0) or 0),
+                "updated_at": row_get(r, "updated_at"),
+            }
+            for r in rows
+        ]
+
+    async def count_success_signals_hourly(self) -> int:
+        row = await self.find_one(Q.COUNT_SUCCESS_SIGNALS_HOURLY)
+        return row_get(row, "c", 0)
+
+    async def find_success_signal_history(
+        self, article_id: str, limit: int
+    ) -> list[dict]:
+        rows = await self.find_all(
+            Q.SELECT_SUCCESS_SIGNAL_HISTORY_BY_ARTICLE,
+            article_id,
+            limit,
+        )
+        return [
+            {
+                "bucket_hour": row_get(r, "bucket_hour"),
+                "success_rate": float(row_get(r, "success_rate", 0) or 0),
+                "engagement_score": float(row_get(r, "engagement_score", 0) or 0),
+            }
+            for r in rows
+        ]
