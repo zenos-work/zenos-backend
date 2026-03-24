@@ -169,3 +169,39 @@ class AdminService:
 
         created = await self._repo.find_content_type_by_slug(slug)
         return {"content_type": created}
+
+    async def list_success_signals(self, page: int = 1, limit: int = 25) -> dict:
+        page = max(1, page)
+        limit = max(1, min(limit, 100))
+        offset = (page - 1) * limit
+
+        snapshots = await self._repo.find_success_signals_hourly(limit, offset)
+        total = await self._repo.count_success_signals_hourly()
+
+        return {
+            "snapshots": snapshots,
+            "pagination": {
+                "page": page,
+                "limit": limit,
+                "total": total,
+                "pages": (total + limit - 1) // limit,
+                "has_more": page * limit < total,
+            },
+        }
+
+    async def list_success_signal_history(
+        self, article_id: str, hours: int = 24
+    ) -> dict:
+        article_id = str(article_id or "").strip()
+        if not article_id:
+            raise ValueError("article_id is required")
+
+        hours = max(1, min(hours, 168))
+        points = await self._repo.find_success_signal_history(article_id, hours)
+        # Return ascending by hour for easier sparkline plotting.
+        points.reverse()
+        return {
+            "article_id": article_id,
+            "hours": hours,
+            "points": points,
+        }

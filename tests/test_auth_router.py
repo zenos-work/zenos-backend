@@ -66,9 +66,15 @@ class FakePrepared:
         return None
 
     async def first(self):
+        if "SELECT id FROM users WHERE google_id = ?" in self.sql:
+            google_id = self.params[0]
+            return self.db.by_google_id.get(google_id)
         if "WHERE google_id = ?" in self.sql:
             google_id = self.params[0]
             return self.db.by_google_id.get(google_id)
+        if "FROM user_preferences WHERE user_id = ?" in self.sql:
+            user_id = self.params[0]
+            return self.db.prefs_by_user_id.get(user_id)
         if "WHERE id = ?" in self.sql:
             user_id = self.params[0]
             return self.db.by_id.get(user_id)
@@ -78,6 +84,7 @@ class FakePrepared:
 class FakeDB:
     def __init__(self):
         self.by_google_id = {}
+        self.prefs_by_user_id = {}
         self.by_id = {
             "user-123": {
                 "id": "user-123",
@@ -194,6 +201,8 @@ async def test_google_callback_success_returns_tokens_and_user(monkeypatch):
     assert "access_token" in body
     assert "refresh_token" in body
     assert body["user"]["email"] == "alice@example.com"
+    assert body["user"]["is_new_user"] is True
+    assert body["user"]["needs_topic_preferences"] is True
 
 
 @pytest.mark.asyncio
@@ -218,6 +227,10 @@ async def test_google_callback_preserves_custom_avatar_on_login(monkeypatch):
         "role": "AUTHOR",
         "terms_accepted_at": None,
     }
+    env.DB.prefs_by_user_id["existing-user"] = {
+        "user_id": "existing-user",
+        "topics": '["technology", "ai", "python"]',
+    }
 
     request = DummyRequest(
         method="POST",
@@ -231,6 +244,8 @@ async def test_google_callback_preserves_custom_avatar_on_login(monkeypatch):
     body = response.json()
     assert body["user"]["name"] == "Alice Updated"
     assert body["user"]["avatar_url"] == "https://cdn.zenos.work/custom-avatar.jpg"
+    assert body["user"]["is_new_user"] is False
+    assert body["user"]["needs_topic_preferences"] is False
 
 
 @pytest.mark.asyncio

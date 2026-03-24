@@ -69,6 +69,17 @@ class _Svc:
         self.calls.append(("create_content_type", payload))
         return {"content_type": {"slug": "deep-dive", "name": payload.get("name", "")}}
 
+    async def list_success_signals(self, page, limit):
+        self.calls.append(("list_success_signals", page, limit))
+        return {
+            "snapshots": [],
+            "pagination": {"page": page, "limit": limit, "total": 0},
+        }
+
+    async def list_success_signal_history(self, article_id, hours):
+        self.calls.append(("list_success_signal_history", article_id, hours))
+        return {"article_id": article_id, "hours": hours, "points": []}
+
 
 @pytest.fixture
 def svc(monkeypatch):
@@ -319,6 +330,95 @@ class TestAdminHandler:
             _Env(),
             "/api/admin/content-types",
             "POST",
+            {},
+            _Ctx(),
+        )
+
+        assert resp.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_success_signals_get_forbidden_without_superadmin(
+        self, monkeypatch, svc
+    ):
+        async def _user(_request, _env):
+            return {"sub": "u1", "role": "AUTHOR"}
+
+        monkeypatch.setattr(admin_handler, "get_user", _user)
+        monkeypatch.setattr(admin_handler, "require_role", lambda user, allowed: False)
+
+        resp = await admin_handler.handle_admin(
+            _Req("GET", "/api/admin/success-signals"),
+            _Env(),
+            "/api/admin/success-signals",
+            "GET",
+            {},
+            _Ctx(),
+        )
+
+        assert resp.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_success_signals_get_success(self, monkeypatch, svc, allow_all):
+        async def _user(_request, _env):
+            return {"sub": "u1", "role": "SUPERADMIN"}
+
+        monkeypatch.setattr(admin_handler, "get_user", _user)
+
+        resp = await admin_handler.handle_admin(
+            _Req("GET", "/api/admin/success-signals?page=2&limit=10"),
+            _Env(),
+            "/api/admin/success-signals",
+            "GET",
+            {"page": ["2"], "limit": ["10"]},
+            _Ctx(),
+        )
+
+        assert resp.status_code == 200
+        assert ("list_success_signals", 2, 10) in svc.calls
+
+    @pytest.mark.asyncio
+    async def test_success_signals_history_get_success(
+        self, monkeypatch, svc, allow_all
+    ):
+        async def _user(_request, _env):
+            return {"sub": "u1", "role": "SUPERADMIN"}
+
+        monkeypatch.setattr(admin_handler, "get_user", _user)
+
+        resp = await admin_handler.handle_admin(
+            _Req("GET", "/api/admin/success-signals/history?article_id=a1&hours=12"),
+            _Env(),
+            "/api/admin/success-signals/history",
+            "GET",
+            {"article_id": ["a1"], "hours": ["12"]},
+            _Ctx(),
+        )
+
+        assert resp.status_code == 200
+        assert ("list_success_signal_history", "a1", 12) in svc.calls
+
+    @pytest.mark.asyncio
+    async def test_success_signals_history_validation_error(
+        self, monkeypatch, allow_all
+    ):
+        async def _user(_request, _env):
+            return {"sub": "u1", "role": "SUPERADMIN"}
+
+        monkeypatch.setattr(admin_handler, "get_user", _user)
+
+        class _SvcInvalid:
+            async def list_success_signal_history(self, article_id, hours):
+                raise ValueError("article_id is required")
+
+        monkeypatch.setattr(
+            admin_handler, "AdminService", lambda env, ctx: _SvcInvalid()
+        )
+
+        resp = await admin_handler.handle_admin(
+            _Req("GET", "/api/admin/success-signals/history"),
+            _Env(),
+            "/api/admin/success-signals/history",
+            "GET",
             {},
             _Ctx(),
         )

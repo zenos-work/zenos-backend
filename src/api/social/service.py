@@ -2,6 +2,7 @@ from typing import Tuple, List
 from api.social.repository import SocialRepository
 from api.articles.repository import ArticleRepository
 from api.users.repository import UserRepository
+from api.analytics.service import AnalyticsService
 from models.social.model import SocialActionResult
 
 
@@ -12,6 +13,7 @@ class SocialService:
         self._repo = SocialRepository(env.DB, ctx)
         self._article_repo = ArticleRepository(env.DB, ctx)
         self._user_repo = UserRepository(env.DB, ctx)
+        self._analytics_service = AnalyticsService(env, ctx)
         self._ctx = ctx
 
     async def _analytics(self, name: str, data: dict = None) -> None:
@@ -27,6 +29,15 @@ class SocialService:
             try:
                 await self._repo.like(user_id, article_id)
                 await self._article_repo.increment_likes(article_id)
+                try:
+                    await self._analytics_service.record_article_event(
+                        article_id=article_id,
+                        event_type="LIKE",
+                        actor_user_id=user_id,
+                        event_source="api",
+                    )
+                except Exception:
+                    pass
             except Exception:
                 raise ValueError("Already liked")
         else:

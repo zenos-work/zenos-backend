@@ -1,6 +1,7 @@
 from typing import Optional
 from api.articles.repository import ArticleRepository
 from api.articles.moderation import ArticleModerationEngine
+from api.analytics.service import AnalyticsService
 from models.article.model import Article
 from models.article.requests import ArticleCreateRequest, ArticleUpdateRequest
 from models.common.pagination import PaginatedResponse
@@ -19,6 +20,7 @@ class ArticleService:
     def __init__(self, env, ctx=None):
         self._repo = ArticleRepository(env.DB, ctx)
         self._moderation = ArticleModerationEngine()
+        self._analytics_service = AnalyticsService(env, ctx)
         self._ctx = ctx
 
     async def _log(self, name: str, data: dict = None) -> None:
@@ -276,4 +278,13 @@ class ArticleService:
 
     async def increment_views(self, article_id: str) -> None:
         await self._repo.increment_views(article_id)
+        try:
+            await self._analytics_service.record_article_event(
+                article_id=article_id,
+                event_type="VIEW",
+                event_source="api",
+            )
+        except Exception:
+            # Keep article read flow resilient if analytics write fails.
+            pass
         await self._analytics("article.viewed", {"article_id": article_id})

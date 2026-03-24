@@ -871,10 +871,11 @@ MVP1 focus: authenticated writing, review workflow, publishing, and readable dis
 - Draft to publish lifecycle: sections 3.1 to 3.6
 - Reader discovery and consumption: sections 4.1 and 4.2
 - SR-010 delivered via reader-side heading-derived table of contents
-- SR-011 delivered via reader-side success signals:
-  - Verification freshness state (`freshly verified`, `aging`, `expired`, or `not set`)
-  - Engagement traction signal derived from views, likes, and comments
-  - Outcome evidence signal from outcome-tag coverage
+- SR-011 delivered as hybrid runtime + analytics architecture:
+    - Reader-side signal rendering remains in UI for immediate feedback
+    - Lightweight events captured in backend table `article_events`
+    - Hourly aggregation via scheduled Worker Cron into `article_success_hourly`
+    - Aggregated `engagement_score` and `success_rate` support trend analysis and verification
 - Rich article metadata currently used by frontend:
     - Dynamic content types via `GET /api/articles/content-types`
     - In-page table-of-contents rendering from article headings

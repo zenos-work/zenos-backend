@@ -41,6 +41,25 @@ async def handle_admin(request, env, path, method, query, ctx):
             return error("Forbidden", 403)
         return json_resp(await svc.list_content_types())
 
+    # GET /api/admin/success-signals — SUPERADMIN
+    if method == "GET" and section == "success-signals":
+        if not require_role(user, ["SUPERADMIN"]):
+            return error("Forbidden", 403)
+        if target == "history":
+            article_id = str(query.get("article_id", [""])[0]).strip()
+            hours = int(query.get("hours", ["24"])[0])
+            try:
+                return json_resp(
+                    await svc.list_success_signal_history(
+                        article_id=article_id, hours=hours
+                    )
+                )
+            except ValueError as e:
+                return error(str(e), 422)
+        page = int(query.get("page", ["1"])[0])
+        limit = int(query.get("limit", ["25"])[0])
+        return json_resp(await svc.list_success_signals(page=page, limit=limit))
+
     # POST /api/admin/content-types — SUPERADMIN
     if method == "POST" and section == "content-types":
         if not require_role(user, ["SUPERADMIN"]):

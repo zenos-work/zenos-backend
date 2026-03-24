@@ -179,3 +179,44 @@ class AdminRepository(BaseRepository):
             sort_order,
             created_by,
         )
+
+    async def find_success_signals_hourly(self, limit: int, offset: int) -> list[dict]:
+        rows = await self.find_all(Q.SELECT_SUCCESS_SIGNALS_HOURLY, limit, offset)
+        return [
+            {
+                "article_id": row_get(r, "article_id"),
+                "slug": row_get(r, "slug"),
+                "title": row_get(r, "title"),
+                "bucket_hour": row_get(r, "bucket_hour"),
+                "views_count": int(row_get(r, "views_count", 0) or 0),
+                "likes_count": int(row_get(r, "likes_count", 0) or 0),
+                "comments_count": int(row_get(r, "comments_count", 0) or 0),
+                "outcome_events_count": int(row_get(r, "outcome_events_count", 0) or 0),
+                "outcome_tag_count": int(row_get(r, "outcome_tag_count", 0) or 0),
+                "engagement_score": float(row_get(r, "engagement_score", 0) or 0),
+                "success_rate": float(row_get(r, "success_rate", 0) or 0),
+                "updated_at": row_get(r, "updated_at"),
+            }
+            for r in rows
+        ]
+
+    async def count_success_signals_hourly(self) -> int:
+        row = await self.find_one(Q.COUNT_SUCCESS_SIGNALS_HOURLY)
+        return row_get(row, "c", 0)
+
+    async def find_success_signal_history(
+        self, article_id: str, limit: int
+    ) -> list[dict]:
+        rows = await self.find_all(
+            Q.SELECT_SUCCESS_SIGNAL_HISTORY_BY_ARTICLE,
+            article_id,
+            limit,
+        )
+        return [
+            {
+                "bucket_hour": row_get(r, "bucket_hour"),
+                "success_rate": float(row_get(r, "success_rate", 0) or 0),
+                "engagement_score": float(row_get(r, "engagement_score", 0) or 0),
+            }
+            for r in rows
+        ]

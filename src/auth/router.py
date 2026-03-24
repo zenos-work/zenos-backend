@@ -1,5 +1,6 @@
 """Authentication router - Google OAuth2 + JWT."""
 
+import json
 import uuid
 from js import Headers, Response
 
@@ -74,6 +75,13 @@ async def handle_auth(request, env, path: str):
                     request=request,
                 )
 
+            existing_user = (
+                await env.DB.prepare("SELECT id FROM users WHERE google_id = ?")
+                .bind(google_id)
+                .first()
+            )
+            is_new_user = existing_user is None
+
             user_id = str(uuid.uuid4())
             await (
                 env.DB.prepare(
@@ -112,6 +120,29 @@ async def handle_auth(request, env, path: str):
                     request=request,
                 )
 
+            prefs_row = (
+                await env.DB.prepare(
+                    "SELECT topics FROM user_preferences WHERE user_id = ?"
+                )
+                .bind(row_get(row, "id"))
+                .first()
+            )
+            prefs_topics = []
+            if prefs_row:
+                raw_topics = row_get(prefs_row, "topics", "[]")
+                try:
+                    prefs_topics = (
+                        json.loads(raw_topics)
+                        if isinstance(raw_topics, str)
+                        else raw_topics
+                    )
+                    if not isinstance(prefs_topics, list):
+                        prefs_topics = []
+                except Exception:
+                    prefs_topics = []
+
+            needs_topic_preferences = len(prefs_topics) < 3
+
             access_token = create_token(
                 {
                     "sub": row_get(row, "id"),
@@ -147,6 +178,8 @@ async def handle_auth(request, env, path: str):
                             row,
                             "terms_accepted_at",
                         ),
+                        "is_new_user": is_new_user,
+                        "needs_topic_preferences": needs_topic_preferences,
                     },
                 },
                 env=env,

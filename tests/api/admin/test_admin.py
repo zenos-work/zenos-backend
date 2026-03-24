@@ -88,6 +88,41 @@ class DummyRepo:
     async def insert_content_type(self, *args, **kwargs):
         return None
 
+    async def find_success_signals_hourly(self, limit, offset):
+        return [
+            {
+                "article_id": "a1",
+                "slug": "first-post",
+                "title": "First Post",
+                "bucket_hour": "2026-03-24 12:00:00",
+                "views_count": 50,
+                "likes_count": 10,
+                "comments_count": 4,
+                "outcome_events_count": 1,
+                "outcome_tag_count": 2,
+                "engagement_score": 136.0,
+                "success_rate": 68.0,
+                "updated_at": "2026-03-24 12:05:00",
+            }
+        ]
+
+    async def count_success_signals_hourly(self):
+        return 1
+
+    async def find_success_signal_history(self, article_id, limit):
+        return [
+            {
+                "bucket_hour": "2026-03-24 12:00:00",
+                "success_rate": 50.0,
+                "engagement_score": 100.0,
+            },
+            {
+                "bucket_hour": "2026-03-24 11:00:00",
+                "success_rate": 25.0,
+                "engagement_score": 60.0,
+            },
+        ]
+
 
 class DummyCtx:
     pass
@@ -262,3 +297,31 @@ async def test_create_content_type_rejects_duplicate_slug():
 
     with _pytest.raises(ValueError, match="content type already exists"):
         await svc.create_content_type({"name": "Article"}, actor_id="u1")
+
+
+@pytest.mark.asyncio
+async def test_list_success_signals_returns_paginated_snapshots():
+    svc = AdminService(DummyEnv(), DummyCtx())
+    svc._repo = DummyRepo()
+
+    result = await svc.list_success_signals(page=1, limit=25)
+
+    assert "snapshots" in result
+    assert len(result["snapshots"]) == 1
+    assert result["snapshots"][0]["article_id"] == "a1"
+    assert result["pagination"]["total"] == 1
+    assert result["pagination"]["has_more"] is False
+
+
+@pytest.mark.asyncio
+async def test_list_success_signal_history_returns_points_in_ascending_order():
+    svc = AdminService(DummyEnv(), DummyCtx())
+    svc._repo = DummyRepo()
+
+    result = await svc.list_success_signal_history(article_id="a1", hours=24)
+
+    assert result["article_id"] == "a1"
+    assert result["hours"] == 24
+    assert len(result["points"]) == 2
+    assert result["points"][0]["bucket_hour"] == "2026-03-24 11:00:00"
+    assert result["points"][1]["bucket_hour"] == "2026-03-24 12:00:00"

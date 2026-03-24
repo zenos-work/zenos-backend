@@ -12,7 +12,12 @@ async def handle_tags(request, env, path, method, query, ctx):
 
     # GET /api/tags
     if method == "GET" and not tag_id:
-        tags = await svc.list_all()
+        onboarding_flag = str(query.get("onboarding", ["0"])[0]).lower() in {
+            "1",
+            "true",
+            "yes",
+        }
+        tags = await svc.list_onboarding() if onboarding_flag else await svc.list_all()
         return json_resp({"tags": [t.to_dict() for t in tags]})
 
     # GET /api/tags/:slug_or_id
@@ -33,6 +38,11 @@ async def handle_tags(request, env, path, method, query, ctx):
             req = TagCreateRequest.from_body(await request.json())
         except ValueError as e:
             return error(str(e), 422)
+
+        if req.is_onboarding_category or req.category_slug:
+            if not require_role(user, ["SUPERADMIN", "APPROVER"]):
+                return error("Forbidden", 403)
+
         tag = await svc.create(req)
         return json_resp({"tag": tag.to_dict()}, 201)
 
