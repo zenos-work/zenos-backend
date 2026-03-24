@@ -8,20 +8,20 @@ SELECT_BASE = (
 )
 
 SELECT_PUBLISHED_LIST = (
-    SELECT_BASE + " WHERE a.status = ? AND (? IS NULL OR a.content_type = ?)"
+    SELECT_BASE + " WHERE a.status = ? AND (? = '' OR a.content_type = ?)"
     " ORDER BY a.published_at DESC LIMIT ? OFFSET ?"
 )
 
 SELECT_PUBLISHED_BY_TAG = (
     SELECT_BASE + " JOIN article_tags at ON a.id = at.article_id"
     " JOIN tags t ON at.tag_id = t.id"
-    " WHERE a.status = ? AND t.slug = ? AND (? IS NULL OR a.content_type = ?)"
+    " WHERE a.status = ? AND t.slug = ? AND (? = '' OR a.content_type = ?)"
     " ORDER BY a.published_at DESC LIMIT ? OFFSET ?"
 )
 
 SELECT_PUBLISHED_SEARCH = (
     SELECT_BASE + " WHERE a.status = ?"
-    " AND (? IS NULL OR a.content_type = ?)"
+    " AND (? = '' OR a.content_type = ?)"
     " AND (a.title LIKE ? OR a.subtitle LIKE ?)"
     " ORDER BY a.published_at DESC LIMIT ? OFFSET ?"
 )

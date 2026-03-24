@@ -92,8 +92,8 @@ class D1Executor:
             await self._log(sql, normalized)
             await self._db.prepare(sql).bind(*normalized).run()
         except Exception as e:
-            # Here you could add logging of the error, including the SQL and params
-            raise e  # Re-raise the exception after logging
+            await self._log_error(sql, normalized, e)
+            raise
 
     async def first(self, sql: str, *params) -> Optional[Any]:
         normalized = self._normalize_params(params)
@@ -102,8 +102,8 @@ class D1Executor:
             result = await self._db.prepare(sql).bind(*normalized).first()
             return result if result else None
         except Exception as e:
-            # Here you could add logging of the error, including the SQL and params
-            raise e  # Re-raise the exception after logging
+            await self._log_error(sql, normalized, e)
+            raise
 
     async def all(self, sql: str, *params) -> list:
         normalized = self._normalize_params(params)
@@ -112,8 +112,8 @@ class D1Executor:
             result = await self._db.prepare(sql).bind(*normalized).all()
             return result.results if result else []
         except Exception as e:
-            # Here you could add logging of the error, including the SQL and params
-            raise e  # Re-raise the exception after logging
+            await self._log_error(sql, normalized, e)
+            raise
 
     async def _log(self, sql: str, params: tuple) -> None:
         if self._ctx:
@@ -123,3 +123,19 @@ class D1Executor:
             )
             if inspect.isawaitable(result):
                 await result
+
+    async def _log_error(self, sql: str, params: tuple, exc: Exception) -> None:
+        msg = f"db.error: {type(exc).__name__}: {exc} | sql={sql[:200]}"
+        if self._ctx:
+            result = self._ctx.log.error(
+                msg,
+                event_data={
+                    "sql": sql[:200],
+                    "params": list(params),
+                    "error": str(exc),
+                },
+            )
+            if inspect.isawaitable(result):
+                await result
+        else:
+            print(msg)

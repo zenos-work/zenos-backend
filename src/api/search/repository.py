@@ -27,16 +27,18 @@ class SearchRepository(BaseRepository):
         outcome_tag: str = None,
         verified_only: bool = False,
     ) -> list:
+        content_type_param = content_type or ""
+        outcome_tag_param = outcome_tag or ""
         rows = await self.find_all(
             Q.SELECT_ARTICLES_FTS,
             fts_query,
             status,
             status,
-            content_type,
-            content_type,
+            content_type_param,
+            content_type_param,
             1 if verified_only else 0,
-            outcome_tag,
-            outcome_tag,
+            outcome_tag_param,
+            outcome_tag_param,
             limit,
             offset,
         )
@@ -50,16 +52,18 @@ class SearchRepository(BaseRepository):
         outcome_tag: str = None,
         verified_only: bool = False,
     ) -> int:
+        content_type_param = content_type or ""
+        outcome_tag_param = outcome_tag or ""
         row = await self.find_one(
             Q.COUNT_ARTICLES_FTS,
             fts_query,
             status,
             status,
-            content_type,
-            content_type,
+            content_type_param,
+            content_type_param,
             1 if verified_only else 0,
-            outcome_tag,
-            outcome_tag,
+            outcome_tag_param,
+            outcome_tag_param,
         )
         return self._extract_count(row)
 

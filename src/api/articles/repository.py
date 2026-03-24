@@ -26,13 +26,14 @@ class ArticleRepository(BaseRepository):
         content_type: Optional[str] = None,
     ) -> PaginatedResponse:
         offset = (page - 1) * limit
+        content_type_param = content_type or ""
         if tag:
             rows = await self.find_all(
                 Q.SELECT_PUBLISHED_BY_TAG,
                 "PUBLISHED",
                 tag,
-                content_type,
-                content_type,
+                content_type_param,
+                content_type_param,
                 limit,
                 offset,
             )
@@ -40,8 +41,8 @@ class ArticleRepository(BaseRepository):
             rows = await self.find_all(
                 Q.SELECT_PUBLISHED_SEARCH,
                 "PUBLISHED",
-                content_type,
-                content_type,
+                content_type_param,
+                content_type_param,
                 f"%{search}%",
                 f"%{search}%",
                 limit,
@@ -51,8 +52,8 @@ class ArticleRepository(BaseRepository):
             rows = await self.find_all(
                 Q.SELECT_PUBLISHED_LIST,
                 "PUBLISHED",
-                content_type,
-                content_type,
+                content_type_param,
+                content_type_param,
                 limit,
                 offset,
             )
