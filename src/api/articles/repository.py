@@ -315,18 +315,13 @@ class ArticleRepository(BaseRepository):
         comment_id: Optional[str] = None,
         message: str = "",
     ) -> None:
-        # Python Workers may surface None/null-like optional params as JS undefined
-        # during D1 bind. Use empty-string sentinels for optional text columns here.
-        actor_val = actor_id or ""
-        article_val = article_id or ""
-        comment_val = comment_id or ""
         await self.execute(
             Q.INSERT_NOTIFICATION,
             nid,
             user_id,
-            actor_val,
+            actor_id,
             type_,
-            article_val,
-            comment_val,
+            article_id,
+            comment_id,
             message,
         )
