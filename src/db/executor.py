@@ -79,6 +79,9 @@ class D1Executor:
 
         # Last-resort guard: prevent JS proxy-like objects from reaching D1 bind.
         try:
+            rendered = str(value).strip().lower()
+            if self._is_null_like_string(rendered):
+                return self._null_value()
             return str(value)
         except Exception:
             return self._null_value()
