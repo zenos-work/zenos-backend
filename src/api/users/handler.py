@@ -105,7 +105,11 @@ async def handle_users(request, env, path, method, query, ctx):
         result = await svc.get_by_id(user["sub"], scope=Scope.PRIVATE)
         if not result:
             return error("User not found", 404)
-        return json_resp({"user": result.to_dict(Scope.PRIVATE)})
+        prefs = await svc.get_prefs(user["sub"])
+        topics = prefs.get("topics", []) if isinstance(prefs, dict) else []
+        user_payload = result.to_dict(Scope.PRIVATE)
+        user_payload["needs_topic_preferences"] = len(topics) < 3
+        return json_resp({"user": user_payload, "prefs": prefs})
 
     # GET /api/users/:id
     if method == "GET" and user_id and user_id != "me":
