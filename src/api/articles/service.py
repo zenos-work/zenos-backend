@@ -247,12 +247,13 @@ class ArticleService:
         actor_id: Optional[str] = None,
     ) -> None:
         await self._repo.insert_notification(
-            new_id(),
-            user_id,
-            actor_id,
-            type_,
-            article_id,
-            message,
+            nid=new_id(),
+            user_id=user_id,
+            actor_id=actor_id,
+            type_=type_,
+            article_id=article_id,
+            comment_id=None,
+            message=message,
         )
 
     async def build_schema(self, article: Article) -> dict:

@@ -8,6 +8,7 @@ from models.user.model import User
 from models.user.requests import UpdateProfileRequest, UpdateRoleRequest
 from models.common.enums import Scope, UserRole
 import api.users.handler as users_handler
+from api.users.service import UserService
 
 
 class TestUserModel:
@@ -387,3 +388,29 @@ class TestUsersEndpoints:
 
         assert response.status_code == 422
         assert response.json()["error"]["message"] == "Select at least one approver"
+
+
+class TestUserPrefsCompatibility:
+    @pytest.mark.asyncio
+    async def test_service_get_prefs_reads_email_notifs(self):
+        svc = UserService.__new__(UserService)
+
+        class _Repo:
+            async def ensure_prefs(self, _user_id):
+                return None
+
+            async def find_prefs(self, _user_id):
+                return {
+                    "topics": '["careers"]',
+                    "email_notifs": 0,
+                    "theme": "dark",
+                }
+
+        svc._repo = _Repo()
+        svc._ctx = None
+
+        prefs = await svc.get_prefs("u1")
+
+        assert prefs["topics"] == ["careers"]
+        assert prefs["email_notifs"] == 0
+        assert prefs["theme"] == "dark"
