@@ -83,7 +83,7 @@ class UserService:
             topics = []
         return {
             "topics": topics,
-            "email_notifs": row_get(row, "email_notifs", 1),
+            "email_notifs": row_get(row, "notifications_enabled", 1),
             "theme": row_get(row, "theme", "dark"),
         }
 

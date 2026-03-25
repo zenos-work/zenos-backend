@@ -27,7 +27,7 @@ class FeedService:
         topics = topics or []
 
         # First priority: recommendation mix based on preferences + behaviour + follows.
-        if user_id:
+        if user_id and topics:
             articles = await self._repo.find_recommended(user_id, topics, limit, offset)
             if articles:
                 total = await self._repo.count_recommended(user_id, topics)
@@ -48,7 +48,7 @@ class FeedService:
                     "has_more": page * limit < total,
                 }
 
-        # Second priority: explicit preference topics for signed-out users.
+        # Second priority: explicit preference topics.
         if topics:
             articles = await self._repo.find_by_topics(topics, limit, offset)
             if articles:

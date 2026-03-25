@@ -30,7 +30,7 @@ UPDATE_ROLE = "UPDATE users SET role = ?," ' updated_at = datetime("now") WHERE 
 UPDATE_SELF_ROLE = "UPDATE users SET role = ?" " WHERE id = ? AND role = ?"
 
 UPDATE_PREFS = (
-    "UPDATE user_preferences SET topics = ?, email_notifs = ?, theme = ?,"
+    "UPDATE user_preferences SET topics = ?, notifications_enabled = ?, theme = ?,"
     ' updated_at = datetime("now") WHERE user_id = ?'
 )
 

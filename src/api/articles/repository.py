@@ -312,7 +312,8 @@ class ArticleRepository(BaseRepository):
         actor_id: Optional[str],
         type_: str,
         article_id: Optional[str],
-        message: str,
+        comment_id: Optional[str] = None,
+        message: str = "",
     ) -> None:
         await self.execute(
             Q.INSERT_NOTIFICATION,
@@ -321,6 +322,6 @@ class ArticleRepository(BaseRepository):
             actor_id,
             type_,
             article_id,
-            None,
+            comment_id,
             message,
         )
