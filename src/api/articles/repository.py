@@ -315,13 +315,18 @@ class ArticleRepository(BaseRepository):
         comment_id: Optional[str] = None,
         message: str = "",
     ) -> None:
+        # In Python Workers, optional JS-proxy values can surface as undefined.
+        # Bind empty-string sentinels and coerce them to SQL NULL via NULLIF in query.
+        actor_val = actor_id or ""
+        article_val = article_id or ""
+        comment_val = comment_id or ""
         await self.execute(
             Q.INSERT_NOTIFICATION,
             nid,
             user_id,
-            actor_id,
+            actor_val,
             type_,
-            article_id,
-            comment_id,
+            article_val,
+            comment_val,
             message,
         )

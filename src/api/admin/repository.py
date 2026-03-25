@@ -112,14 +112,17 @@ class AdminRepository(BaseRepository):
         comment_id: Optional[str],
         message: str,
     ) -> None:
+        actor_val = actor_id or ""
+        article_val = article_id or ""
+        comment_val = comment_id or ""
         await self.execute(
             Q.INSERT_NOTIFICATION,
             nid,
             user_id,
-            actor_id,
+            actor_val,
             type_,
-            article_id,
-            comment_id,
+            article_val,
+            comment_val,
             message,
         )
 

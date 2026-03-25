@@ -75,7 +75,7 @@ COUNT_NOTIFICATIONS_BY_USER = (
 INSERT_NOTIFICATION = (
     "INSERT INTO notifications"
     " (id, user_id, actor_id, type, article_id, comment_id, message)"
-    " VALUES (?, ?, ?, ?, ?, ?, ?)"
+    " VALUES (?, ?, NULLIF(?, ''), ?, NULLIF(?, ''), NULLIF(?, ''), ?)"
 )
 
 UPDATE_MARK_NOTIFICATIONS_READ = (

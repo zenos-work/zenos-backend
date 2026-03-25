@@ -126,7 +126,7 @@ SELECT_APPROVER_IDS = (
 INSERT_NOTIFICATION = (
     "INSERT INTO notifications"
     " (id, user_id, actor_id, type, article_id, comment_id, message)"
-    " VALUES (?, ?, ?, ?, ?, ?, ?)"
+    " VALUES (?, ?, NULLIF(?, ''), ?, NULLIF(?, ''), NULLIF(?, ''), ?)"
 )
 
 SELECT_CONTENT_TYPES_PUBLIC = (
