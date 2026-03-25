@@ -363,9 +363,9 @@ class TestArticleRepository:
         assert executed[-2][1] == (
             "n1",
             "u1",
-            None,
+            "",
             "MODERATION_PENDING",
             "a1",
-            None,
+            "",
             "pending review",
         )
