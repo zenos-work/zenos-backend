@@ -219,7 +219,12 @@ class FakeUserService:
         return {"user_id": user_id, "is_active": True}
 
     async def get_prefs(self, user_id):
-        return {"topics": ["fintech"], "user_id": user_id}
+        return {
+            "topics": ["fintech"],
+            "email_notifs": 1,
+            "theme": "dark",
+            "user_id": user_id,
+        }
 
     async def update_prefs(self, user_id, topics, email_notifs, theme):
         return {

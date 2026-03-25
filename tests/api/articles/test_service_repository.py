@@ -334,6 +334,15 @@ class TestArticleRepository:
         await repo.increment_likes("a1")
         await repo.decrement_likes("a1")
         await repo.increment_comments("a1")
+        await repo.insert_notification(
+            "n1",
+            "u1",
+            None,
+            "MODERATION_PENDING",
+            "a1",
+            None,
+            "pending review",
+        )
         await repo.delete("a1")
 
         sqls = [s for s, _ in executed]
@@ -349,4 +358,14 @@ class TestArticleRepository:
         assert Q.UPDATE_INCREMENT_LIKES in sqls
         assert Q.UPDATE_DECREMENT_LIKES in sqls
         assert Q.UPDATE_INCREMENT_COMMENTS in sqls
+        assert Q.INSERT_NOTIFICATION in sqls
         assert Q.DELETE_ARTICLE in sqls
+        assert executed[-2][1] == (
+            "n1",
+            "u1",
+            "",
+            "MODERATION_PENDING",
+            "a1",
+            "",
+            "pending review",
+        )

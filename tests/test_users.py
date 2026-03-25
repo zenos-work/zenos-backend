@@ -193,6 +193,10 @@ class TestUsersEndpoints:
         data = response.json()
         assert "email" in data["user"]  # Private field included
         assert data["user"]["terms_accepted_at"] == "2026-03-18T10:00:00Z"
+        assert data["user"]["needs_topic_preferences"] is True
+        assert data["prefs"]["topics"] == ["fintech"]
+        assert data["prefs"]["email_notifs"] == 1
+        assert data["prefs"]["theme"] == "dark"
         assert "google_id" not in data["user"]
 
     def test_get_authenticated_user_requires_auth(self, client):
