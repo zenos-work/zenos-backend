@@ -17,6 +17,7 @@ class TestAdminRepository:
                 Q.COUNT_ACTIVE_USERS: {"c": 11},
                 Q.COUNT_USERS_TOTAL: {"c": 15},
                 Q.COUNT_ACTIVE_COMMENTS: {"c": 20},
+                Q.COUNT_TOTAL_SHARES: {"c": 44},
                 Q.COUNT_PENDING_APPROVALS: {"c": 2},
                 Q.COUNT_FLAGGED_COMMENTS: {"c": 3},
                 Q.COUNT_HIDDEN_COMMENTS: {"c": 4},
@@ -42,6 +43,7 @@ class TestAdminRepository:
         assert await repo.count_active_users() == 11
         assert await repo.count_users_total() == 15
         assert await repo.count_active_comments() == 20
+        assert await repo.count_total_shares() == 44
         assert await repo.count_pending_approvals() == 2
         assert await repo.count_flagged_comments() == 3
         assert await repo.count_hidden_comments() == 4

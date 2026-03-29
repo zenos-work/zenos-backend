@@ -25,6 +25,7 @@ def _article(id="a1", title="Title", status=ArticleStatus.DRAFT):
         author_id="u1",
         views_count=0,
         likes_count=0,
+        dislikes_count=0,
         comments_count=0,
         is_featured=0,
         read_time_minutes=1,
@@ -333,6 +334,7 @@ class TestArticleRepository:
         await repo.increment_views("a1")
         await repo.increment_likes("a1")
         await repo.decrement_likes("a1")
+        await repo.increment_shares("a1")
         await repo.increment_comments("a1")
         await repo.insert_notification(
             "n1",
@@ -357,6 +359,7 @@ class TestArticleRepository:
         assert Q.UPDATE_INCREMENT_VIEWS in sqls
         assert Q.UPDATE_INCREMENT_LIKES in sqls
         assert Q.UPDATE_DECREMENT_LIKES in sqls
+        assert Q.UPDATE_INCREMENT_SHARES in sqls
         assert Q.UPDATE_INCREMENT_COMMENTS in sqls
         assert Q.INSERT_NOTIFICATION in sqls
         assert Q.DELETE_ARTICLE in sqls

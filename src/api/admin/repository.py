@@ -42,6 +42,10 @@ class AdminRepository(BaseRepository):
         row = await self.find_one(Q.COUNT_ACTIVE_COMMENTS)
         return row_get(row, "c", 0)
 
+    async def count_total_shares(self) -> int:
+        row = await self.find_one(Q.COUNT_TOTAL_SHARES)
+        return row_get(row, "c", 0)
+
     async def count_pending_approvals(self) -> int:
         row = await self.find_one(Q.COUNT_PENDING_APPROVALS)
         return row_get(row, "c", 0)
@@ -220,6 +224,77 @@ class AdminRepository(BaseRepository):
                 "bucket_hour": row_get(r, "bucket_hour"),
                 "success_rate": float(row_get(r, "success_rate", 0) or 0),
                 "engagement_score": float(row_get(r, "engagement_score", 0) or 0),
+            }
+            for r in rows
+        ]
+
+    async def get_ranking_weights(self) -> Optional[dict]:
+        row = await self.find_one(Q.SELECT_RANKING_WEIGHTS)
+        if not row:
+            return None
+        return {
+            "likes_weight": float(row_get(row, "likes_weight", 1.0) or 1.0),
+            "shares_weight": float(row_get(row, "shares_weight", 2.0) or 2.0),
+            "comments_weight": float(row_get(row, "comments_weight", 1.5) or 1.5),
+            "dislikes_weight": float(row_get(row, "dislikes_weight", -1.0) or -1.0),
+            "views_weight": float(row_get(row, "views_weight", 0.1) or 0.1),
+            "recency_weight": float(row_get(row, "recency_weight", 0.25) or 0.25),
+            "updated_by": row_get(row, "updated_by"),
+            "updated_at": row_get(row, "updated_at"),
+        }
+
+    async def upsert_ranking_weights(
+        self,
+        likes_weight: float,
+        shares_weight: float,
+        comments_weight: float,
+        dislikes_weight: float,
+        views_weight: float,
+        recency_weight: float,
+        updated_by: str,
+    ) -> None:
+        await self.execute(
+            Q.UPSERT_RANKING_WEIGHTS,
+            likes_weight,
+            shares_weight,
+            comments_weight,
+            dislikes_weight,
+            views_weight,
+            recency_weight,
+            updated_by,
+        )
+
+    async def find_ranked_content_types(self, limit: int) -> list[dict]:
+        rows = await self.find_all(Q.SELECT_RANKED_CONTENT_TYPES, limit)
+        return [
+            {
+                "content_type": row_get(r, "content_type"),
+                "articles_count": int(row_get(r, "articles_count", 0) or 0),
+                "total_score": float(row_get(r, "total_score", 0) or 0),
+                "avg_score": float(row_get(r, "avg_score", 0) or 0),
+                "likes_count": int(row_get(r, "likes_count", 0) or 0),
+                "dislikes_count": int(row_get(r, "dislikes_count", 0) or 0),
+                "shares_count": int(row_get(r, "shares_count", 0) or 0),
+                "comments_count": int(row_get(r, "comments_count", 0) or 0),
+                "views_count": int(row_get(r, "views_count", 0) or 0),
+            }
+            for r in rows
+        ]
+
+    async def find_ranked_categories(self, limit: int) -> list[dict]:
+        rows = await self.find_all(Q.SELECT_RANKED_CATEGORIES, limit)
+        return [
+            {
+                "category_slug": row_get(r, "category_slug"),
+                "category_name": row_get(r, "category_name"),
+                "articles_count": int(row_get(r, "articles_count", 0) or 0),
+                "total_score": float(row_get(r, "total_score", 0) or 0),
+                "avg_score": float(row_get(r, "avg_score", 0) or 0),
+                "likes_count": int(row_get(r, "likes_count", 0) or 0),
+                "dislikes_count": int(row_get(r, "dislikes_count", 0) or 0),
+                "shares_count": int(row_get(r, "shares_count", 0) or 0),
+                "comments_count": int(row_get(r, "comments_count", 0) or 0),
+                "views_count": int(row_get(r, "views_count", 0) or 0),
             }
             for r in rows
         ]

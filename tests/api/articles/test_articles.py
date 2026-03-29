@@ -53,6 +53,7 @@ def _make_article(
         author_id=author_id,
         views_count=0,
         likes_count=0,
+        dislikes_count=0,
         comments_count=0,
         is_featured=0,
         read_time_minutes=3,

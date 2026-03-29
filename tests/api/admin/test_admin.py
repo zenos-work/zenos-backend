@@ -18,6 +18,9 @@ class DummyRepo:
     async def count_active_comments(self):
         return 30
 
+    async def count_total_shares(self):
+        return 22
+
     async def count_articles_by_status(self):
         return [{"status": "PUBLISHED", "c": 9}]
 
@@ -123,6 +126,61 @@ class DummyRepo:
             },
         ]
 
+    async def get_ranking_weights(self):
+        return {
+            "likes_weight": 1.0,
+            "shares_weight": 2.0,
+            "comments_weight": 1.5,
+            "dislikes_weight": -1.0,
+            "views_weight": 0.1,
+            "recency_weight": 0.25,
+            "updated_by": "u-admin",
+            "updated_at": "2026-03-28 10:00:00",
+        }
+
+    async def upsert_ranking_weights(
+        self,
+        likes_weight,
+        shares_weight,
+        comments_weight,
+        dislikes_weight,
+        views_weight,
+        recency_weight,
+        updated_by,
+    ):
+        return None
+
+    async def find_ranked_content_types(self, limit):
+        return [
+            {
+                "content_type": "article",
+                "articles_count": 3,
+                "total_score": 240.0,
+                "avg_score": 80.0,
+                "likes_count": 20,
+                "dislikes_count": 2,
+                "shares_count": 8,
+                "comments_count": 9,
+                "views_count": 200,
+            }
+        ]
+
+    async def find_ranked_categories(self, limit):
+        return [
+            {
+                "category_slug": "fintech",
+                "category_name": "Fintech",
+                "articles_count": 2,
+                "total_score": 180.0,
+                "avg_score": 90.0,
+                "likes_count": 15,
+                "dislikes_count": 1,
+                "shares_count": 6,
+                "comments_count": 7,
+                "views_count": 140,
+            }
+        ]
+
 
 class DummyCtx:
     pass
@@ -141,6 +199,7 @@ async def test_get_stats_contains_governance_blocks():
 
     assert stats["total_users"] == 12
     assert stats["total_comments"] == 30
+    assert stats["total_shares"] == 22
     assert "governance" in stats
     assert stats["governance"]["moderation"]["pending_approvals"] == 4
     assert stats["governance"]["moderation"]["flagged_comments"] == 3
@@ -325,3 +384,81 @@ async def test_list_success_signal_history_returns_points_in_ascending_order():
     assert len(result["points"]) == 2
     assert result["points"][0]["bucket_hour"] == "2026-03-24 11:00:00"
     assert result["points"][1]["bucket_hour"] == "2026-03-24 12:00:00"
+
+
+@pytest.mark.asyncio
+async def test_get_rankings_returns_content_type_and_category_lists():
+    svc = AdminService(DummyEnv(), DummyCtx())
+    svc._repo = DummyRepo()
+
+    result = await svc.get_rankings(limit=8)
+
+    assert "weights" in result
+    assert "content_type_rankings" in result
+    assert "top_category_rankings" in result
+    assert result["content_type_rankings"][0]["content_type"] == "article"
+    assert result["top_category_rankings"][0]["category_slug"] == "fintech"
+
+
+@pytest.mark.asyncio
+async def test_update_ranking_weights_validates_and_returns_saved_weights():
+    class _Repo(DummyRepo):
+        def __init__(self):
+            self.saved = None
+
+        async def upsert_ranking_weights(
+            self,
+            likes_weight,
+            shares_weight,
+            comments_weight,
+            dislikes_weight,
+            views_weight,
+            recency_weight,
+            updated_by,
+        ):
+            self.saved = {
+                "likes_weight": likes_weight,
+                "shares_weight": shares_weight,
+                "comments_weight": comments_weight,
+                "dislikes_weight": dislikes_weight,
+                "views_weight": views_weight,
+                "recency_weight": recency_weight,
+                "updated_by": updated_by,
+            }
+
+        async def get_ranking_weights(self):
+            if self.saved:
+                return {
+                    **self.saved,
+                    "updated_at": "2026-03-28 10:01:00",
+                }
+            return await super().get_ranking_weights()
+
+    svc = AdminService(DummyEnv(), DummyCtx())
+    svc._repo = _Repo()
+
+    result = await svc.update_ranking_weights(
+        {
+            "likes_weight": 1.2,
+            "shares_weight": 2.3,
+            "comments_weight": 1.7,
+            "dislikes_weight": -1.4,
+            "views_weight": 0.2,
+            "recency_weight": 0.3,
+        },
+        actor_id="u-admin",
+    )
+
+    assert result["weights"]["shares_weight"] == 2.3
+    assert result["weights"]["dislikes_weight"] == -1.4
+
+
+@pytest.mark.asyncio
+async def test_update_ranking_weights_rejects_out_of_range_values():
+    svc = AdminService(DummyEnv(), DummyCtx())
+    svc._repo = DummyRepo()
+
+    import pytest as _pytest
+
+    with _pytest.raises(ValueError, match="likes_weight must be between"):
+        await svc.update_ranking_weights({"likes_weight": 99}, actor_id="u-admin")

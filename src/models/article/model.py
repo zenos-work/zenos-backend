@@ -16,6 +16,8 @@ _LIST_FIELDS = {
     "read_time_minutes",
     "views_count",
     "likes_count",
+    "dislikes_count",
+    "shares_count",
     "comments_count",
     "is_featured",
     "published_at",
@@ -50,6 +52,7 @@ class Article(BaseModel):
     author_id: str
     views_count: int
     likes_count: int
+    dislikes_count: int
     comments_count: int
     is_featured: int
     read_time_minutes: int
@@ -60,6 +63,7 @@ class Article(BaseModel):
     subtitle: Optional[str] = None
     content_type: str = "article"
     cover_image_url: Optional[str] = None
+    shares_count: int = 0
     published_at: Optional[str] = None
     rejection_note: Optional[str] = None
     last_verified_at: Optional[str] = None
@@ -111,6 +115,8 @@ class Article(BaseModel):
             author_id=row_get(row, "author_id"),
             views_count=row_get(row, "views_count", 0),
             likes_count=row_get(row, "likes_count", 0),
+            dislikes_count=row_get(row, "dislikes_count", 0),
+            shares_count=row_get(row, "shares_count", 0),
             comments_count=row_get(row, "comments_count", 0),
             is_featured=row_get(row, "is_featured", 0),
             read_time_minutes=row_get(row, "read_time_minutes", 0),
