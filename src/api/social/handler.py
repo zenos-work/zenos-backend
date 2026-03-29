@@ -12,11 +12,12 @@ async def handle_social(request, env, path, method, query, ctx):
     target = parts[4] if len(parts) > 4 else None  # article_id or user_id
     subaction = parts[5] if len(parts) > 5 else None  # check, stats, etc.
 
-    # All endpoints except check operations require auth
     user = await get_user(request, env)
-    if not user:
+    uid = user["sub"] if user else None
+
+    # Allow public fetch of reaction stats; all other endpoints require auth.
+    if not uid and not (action == "reactions" and target and method == "GET"):
         return error("Unauthorised", 401)
-    uid = user["sub"]
 
     # ── LIKES ──────────────────────────────────────
     # POST /api/social/likes/:article_id — Like an article
@@ -50,6 +51,98 @@ async def handle_social(request, env, path, method, query, ctx):
             return json_resp(stats)
         except ValueError as e:
             return error(str(e), 404)
+
+    # ── DISLIKES ───────────────────────────────────
+    # POST /api/social/dislikes/:article_id — Dislike an article
+    if action == "dislikes" and target and method == "POST":
+        try:
+            result = await svc.toggle_dislike(uid, target, add=True)
+            return json_resp({"action": result.to_dict()})
+        except ValueError as e:
+            return error(str(e), 409)
+
+    # DELETE /api/social/dislikes/:article_id — Remove dislike
+    if action == "dislikes" and target and method == "DELETE":
+        try:
+            result = await svc.toggle_dislike(uid, target, add=False)
+            return json_resp({"action": result.to_dict()})
+        except ValueError as e:
+            return error(str(e), 409)
+
+    # GET /api/social/dislikes/:article_id/check — Check if user disliked
+    if action == "dislikes" and target and subaction == "check" and method == "GET":
+        try:
+            has_disliked = await svc.check_disliked(uid, target)
+            return json_resp({"has_disliked": has_disliked})
+        except ValueError as e:
+            return error(str(e), 404)
+
+    # GET /api/social/dislikes/:article_id/stats — Get dislike stats
+    if action == "dislikes" and target and subaction == "stats" and method == "GET":
+        try:
+            stats = await svc.get_dislike_stats(target)
+            return json_resp(stats)
+        except ValueError as e:
+            return error(str(e), 404)
+
+    # ── SHARES ─────────────────────────────────────
+    # POST /api/social/shares/:article_id — Record a share event (LinkedIn-only for now)
+    if action == "shares" and target and method == "POST":
+        try:
+            body = await request.json()
+            provider = (
+                body.get("provider", "linkedin")
+                if isinstance(body, dict)
+                else "linkedin"
+            )
+            result = await svc.share_article(uid, target, provider)
+            return json_resp({"share": result})
+        except ValueError as e:
+            status = 400 if "Unsupported provider" in str(e) else 409
+            return error(str(e), status)
+
+    # GET /api/social/shares/:article_id/stats — Get share stats
+    if action == "shares" and target and subaction == "stats" and method == "GET":
+        try:
+            stats = await svc.get_share_stats(target)
+            return json_resp(stats)
+        except ValueError as e:
+            return error(str(e), 404)
+
+    # ── REACTIONS ─────────────────────────────────
+    # GET /api/social/reactions/:article_id — Get reaction counts (+ user flags if authenticated)
+    if action == "reactions" and target and method == "GET":
+        try:
+            stats = await svc.get_reactions(target, uid)
+            return json_resp(stats)
+        except ValueError as e:
+            return error(str(e), 400)
+
+    # POST /api/social/reactions/:article_id — Toggle one reaction
+    if action == "reactions" and target and method == "POST":
+        if not uid:
+            return error("Unauthorised", 401)
+        try:
+            body = await request.json()
+            reaction_type = (
+                body.get("reaction_type") if isinstance(body, dict) else None
+            )
+            if not reaction_type:
+                return error("reaction_type is required", 422)
+            result = await svc.toggle_reaction(uid, target, reaction_type)
+            return json_resp({"action": result.to_dict()})
+        except ValueError as e:
+            return error(str(e), 422)
+
+    # DELETE /api/social/reactions/:article_id/:reaction_type — Remove reaction explicitly
+    if action == "reactions" and target and subaction and method == "DELETE":
+        if not uid:
+            return error("Unauthorised", 401)
+        try:
+            result = await svc.remove_reaction(uid, target, subaction)
+            return json_resp({"action": result.to_dict()})
+        except ValueError as e:
+            return error(str(e), 422)
 
     # ── BOOKMARKS ──────────────────────────────────
     # GET /api/social/bookmarks — List user's bookmarked articles

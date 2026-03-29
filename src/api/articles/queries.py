@@ -107,6 +107,18 @@ UPDATE_DECREMENT_LIKES = (
     "UPDATE articles SET likes_count = MAX(0, likes_count - 1) WHERE id = ?"
 )
 
+UPDATE_INCREMENT_DISLIKES = (
+    "UPDATE articles SET dislikes_count = dislikes_count + 1 WHERE id = ?"
+)
+
+UPDATE_DECREMENT_DISLIKES = (
+    "UPDATE articles SET dislikes_count = MAX(0, dislikes_count - 1) WHERE id = ?"
+)
+
+UPDATE_INCREMENT_SHARES = (
+    "UPDATE articles SET shares_count = shares_count + 1 WHERE id = ?"
+)
+
 UPDATE_INCREMENT_COMMENTS = (
     "UPDATE articles SET comments_count = comments_count + 1 WHERE id = ?"
 )

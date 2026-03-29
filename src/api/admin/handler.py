@@ -60,6 +60,19 @@ async def handle_admin(request, env, path, method, query, ctx):
         limit = int(query.get("limit", ["25"])[0])
         return json_resp(await svc.list_success_signals(page=page, limit=limit))
 
+    # GET /api/admin/ranking — SUPERADMIN
+    if method == "GET" and section == "ranking":
+        if not require_role(user, ["SUPERADMIN"]):
+            return error("Forbidden", 403)
+        limit = int(query.get("limit", ["10"])[0])
+        return json_resp(await svc.get_rankings(limit=limit))
+
+    # GET /api/admin/ranking-weights — SUPERADMIN
+    if method == "GET" and section == "ranking-weights":
+        if not require_role(user, ["SUPERADMIN"]):
+            return error("Forbidden", 403)
+        return json_resp({"weights": await svc.get_ranking_weights()})
+
     # POST /api/admin/content-types — SUPERADMIN
     if method == "POST" and section == "content-types":
         if not require_role(user, ["SUPERADMIN"]):
@@ -68,6 +81,19 @@ async def handle_admin(request, env, path, method, query, ctx):
             payload = await request.json()
             created = await svc.create_content_type(payload, actor_id=user["sub"])
             return json_resp(created, 201)
+        except ValueError as e:
+            return error(str(e), 422)
+
+    # PUT /api/admin/ranking-weights — SUPERADMIN
+    if method == "PUT" and section == "ranking-weights":
+        if not require_role(user, ["SUPERADMIN"]):
+            return error("Forbidden", 403)
+        try:
+            payload = await request.json()
+            if not isinstance(payload, dict):
+                return error("Invalid payload", 422)
+            updated = await svc.update_ranking_weights(payload, actor_id=user["sub"])
+            return json_resp(updated)
         except ValueError as e:
             return error(str(e), 422)
 

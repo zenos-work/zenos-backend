@@ -133,6 +133,67 @@ class FakeSocialService:
             raise ValueError("Not found")
         return {"article_id": article_id, "like_count": 7}
 
+    async def toggle_dislike(self, user_id, article_id, add):
+        self.calls.append(("toggle_dislike", user_id, article_id, add))
+        if article_id == "already-disliked" and add:
+            raise ValueError("Already disliked")
+        return SocialActionResult(action="dislike", target_id=article_id, active=add)
+
+    async def check_disliked(self, user_id, article_id):
+        self.calls.append(("check_disliked", user_id, article_id))
+        return article_id == "disliked"
+
+    async def get_dislike_stats(self, article_id):
+        self.calls.append(("get_dislike_stats", article_id))
+        return {"article_id": article_id, "dislike_count": 2}
+
+    async def share_article(self, user_id, article_id, provider="linkedin"):
+        self.calls.append(("share_article", user_id, article_id, provider))
+        if provider != "linkedin":
+            raise ValueError("Unsupported provider")
+        return {
+            "article_id": article_id,
+            "provider": provider,
+            "share_count": 3,
+        }
+
+    async def get_share_stats(self, article_id):
+        self.calls.append(("get_share_stats", article_id))
+        return {"article_id": article_id, "share_count": 3}
+
+    async def toggle_reaction(self, user_id, article_id, reaction_type):
+        self.calls.append(("toggle_reaction", user_id, article_id, reaction_type))
+        if reaction_type not in {"fire", "lightbulb", "heart", "brain"}:
+            raise ValueError("Invalid reaction type")
+        return SocialActionResult(
+            action=f"reaction:{reaction_type}",
+            target_id=article_id,
+            active=True,
+        )
+
+    async def remove_reaction(self, user_id, article_id, reaction_type):
+        self.calls.append(("remove_reaction", user_id, article_id, reaction_type))
+        if reaction_type not in {"fire", "lightbulb", "heart", "brain"}:
+            raise ValueError("Invalid reaction type")
+        return SocialActionResult(
+            action=f"reaction:{reaction_type}",
+            target_id=article_id,
+            active=False,
+        )
+
+    async def get_reactions(self, article_id, user_id=None):
+        self.calls.append(("get_reactions", article_id, user_id))
+        return {
+            "article_id": article_id,
+            "reactions": {
+                "fire": {"count": 2, "userReacted": bool(user_id)},
+                "lightbulb": {"count": 1, "userReacted": False},
+                "heart": {"count": 4, "userReacted": False},
+                "brain": {"count": 1, "userReacted": False},
+            },
+            "total_reactions": 8,
+        }
+
     async def get_bookmarks(self, user_id, page, limit):
         self.calls.append(("get_bookmarks", user_id, page, limit))
         return [DummyArticle("a1"), DummyArticle("a2")], 2
@@ -291,6 +352,90 @@ class TestSocialEndpoints:
         )
         assert r.status_code == 200
         assert r.json()["like_count"] == 7
+
+    def test_dislike_article(self, client, author_token):
+        r = client.post(
+            "/api/social/dislikes/a1",
+            headers={"Authorization": f"Bearer {author_token}"},
+        )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["action"]["action"] == "dislike"
+        assert body["action"]["active"] is True
+
+    def test_undislike_article(self, client, author_token):
+        r = client.delete(
+            "/api/social/dislikes/a1",
+            headers={"Authorization": f"Bearer {author_token}"},
+        )
+        assert r.status_code == 200
+        assert r.json()["action"]["active"] is False
+
+    def test_dislike_check(self, client, author_token):
+        r = client.get(
+            "/api/social/dislikes/disliked/check",
+            headers={"Authorization": f"Bearer {author_token}"},
+        )
+        assert r.status_code == 200
+        assert r.json()["has_disliked"] is True
+
+    def test_dislike_stats(self, client, author_token):
+        r = client.get(
+            "/api/social/dislikes/a1/stats",
+            headers={"Authorization": f"Bearer {author_token}"},
+        )
+        assert r.status_code == 200
+        assert r.json()["dislike_count"] == 2
+
+    def test_share_article_linkedin(self, client, author_token):
+        r = client.post(
+            "/api/social/shares/a1",
+            headers={"Authorization": f"Bearer {author_token}"},
+            json={"provider": "linkedin"},
+        )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["share"]["provider"] == "linkedin"
+        assert body["share"]["share_count"] == 3
+
+    def test_share_article_rejects_unknown_provider(self, client, author_token):
+        r = client.post(
+            "/api/social/shares/a1",
+            headers={"Authorization": f"Bearer {author_token}"},
+            json={"provider": "x"},
+        )
+        assert r.status_code == 400
+
+    def test_share_stats(self, client, author_token):
+        r = client.get(
+            "/api/social/shares/a1/stats",
+            headers={"Authorization": f"Bearer {author_token}"},
+        )
+        assert r.status_code == 200
+        assert r.json()["share_count"] == 3
+
+    def test_get_reactions_public(self, client):
+        r = client.get("/api/social/reactions/a1")
+        assert r.status_code == 200
+        assert r.json()["article_id"] == "a1"
+        assert r.json()["reactions"]["fire"]["count"] == 2
+
+    def test_toggle_reaction(self, client, author_token):
+        r = client.post(
+            "/api/social/reactions/a1",
+            headers={"Authorization": f"Bearer {author_token}"},
+            json={"reaction_type": "fire"},
+        )
+        assert r.status_code == 200
+        assert r.json()["action"]["action"] == "reaction:fire"
+
+    def test_remove_reaction(self, client, author_token):
+        r = client.delete(
+            "/api/social/reactions/a1/fire",
+            headers={"Authorization": f"Bearer {author_token}"},
+        )
+        assert r.status_code == 200
+        assert r.json()["action"]["active"] is False
 
     # ── Bookmarks ─────────────────────────────────────────────────────────────
 

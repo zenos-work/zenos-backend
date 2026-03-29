@@ -1,4 +1,5 @@
-from typing import Protocol, Tuple, List
+from typing import Protocol, Tuple, List, Optional
+from models.social.model import SocialActionResult
 
 
 class ISocialService(Protocol):
@@ -6,6 +7,19 @@ class ISocialService(Protocol):
     async def toggle_like(self, user_id: str, article_id: str, add: bool) -> bool: ...
     async def check_liked(self, user_id: str, article_id: str) -> bool: ...
     async def get_like_stats(self, article_id: str) -> dict: ...
+    async def share_article(
+        self, user_id: str, article_id: str, provider: str = "linkedin"
+    ) -> dict: ...
+    async def get_share_stats(self, article_id: str) -> dict: ...
+    async def toggle_reaction(
+        self, user_id: str, article_id: str, reaction_type: str
+    ) -> SocialActionResult: ...
+    async def remove_reaction(
+        self, user_id: str, article_id: str, reaction_type: str
+    ) -> SocialActionResult: ...
+    async def get_reactions(
+        self, article_id: str, user_id: Optional[str] = None
+    ) -> dict: ...
 
     # Bookmarks
     async def toggle_bookmark(

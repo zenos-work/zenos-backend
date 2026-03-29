@@ -13,10 +13,24 @@ class AdminService:
         self._user_repo = UserRepository(env.DB, ctx)
         self._ctx = ctx
 
+    @staticmethod
+    def _default_ranking_weights() -> dict:
+        return {
+            "likes_weight": 1.0,
+            "shares_weight": 2.0,
+            "comments_weight": 1.5,
+            "dislikes_weight": -1.0,
+            "views_weight": 0.1,
+            "recency_weight": 0.25,
+            "updated_by": None,
+            "updated_at": None,
+        }
+
     async def get_stats(self) -> dict:
         total_users = await self._repo.count_active_users()
         users_by_role = await self._repo.count_users_by_role()
         total_comments = await self._repo.count_active_comments()
+        total_shares = await self._repo.count_total_shares()
         articles_status = await self._repo.count_articles_by_status()
         top_articles = await self._repo.find_top_articles()
         pending_approvals = await self._repo.count_pending_approvals()
@@ -29,6 +43,7 @@ class AdminService:
         return {
             "total_users": total_users,
             "total_comments": total_comments,
+            "total_shares": total_shares,
             "articles_by_status": articles_status,
             "top_articles": [a.to_dict(Scope.LIST) for a in top_articles],
             "governance": {
@@ -204,4 +219,49 @@ class AdminService:
             "article_id": article_id,
             "hours": hours,
             "points": points,
+        }
+
+    async def get_ranking_weights(self) -> dict:
+        return await self._repo.get_ranking_weights() or self._default_ranking_weights()
+
+    async def update_ranking_weights(self, payload: dict, actor_id: str) -> dict:
+        current = await self.get_ranking_weights()
+
+        def pick(name: str, minimum: float, maximum: float) -> float:
+            raw = payload.get(name, current[name])
+            try:
+                value = float(raw)
+            except Exception as exc:
+                raise ValueError(f"{name} must be a number") from exc
+            if value < minimum or value > maximum:
+                raise ValueError(f"{name} must be between {minimum} and {maximum}")
+            return value
+
+        likes_weight = pick("likes_weight", -10.0, 10.0)
+        shares_weight = pick("shares_weight", -10.0, 10.0)
+        comments_weight = pick("comments_weight", -10.0, 10.0)
+        dislikes_weight = pick("dislikes_weight", -10.0, 10.0)
+        views_weight = pick("views_weight", -1.0, 10.0)
+        recency_weight = pick("recency_weight", 0.0, 10.0)
+
+        await self._repo.upsert_ranking_weights(
+            likes_weight,
+            shares_weight,
+            comments_weight,
+            dislikes_weight,
+            views_weight,
+            recency_weight,
+            actor_id,
+        )
+        return {"weights": await self.get_ranking_weights()}
+
+    async def get_rankings(self, limit: int = 10) -> dict:
+        safe_limit = max(1, min(int(limit or 10), 50))
+        weights = await self.get_ranking_weights()
+        by_content_type = await self._repo.find_ranked_content_types(safe_limit)
+        top_categories = await self._repo.find_ranked_categories(safe_limit)
+        return {
+            "weights": weights,
+            "content_type_rankings": by_content_type,
+            "top_category_rankings": top_categories,
         }

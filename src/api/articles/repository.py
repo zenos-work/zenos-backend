@@ -296,6 +296,15 @@ class ArticleRepository(BaseRepository):
     async def decrement_likes(self, article_id: str) -> None:
         await self.execute(Q.UPDATE_DECREMENT_LIKES, article_id)
 
+    async def increment_dislikes(self, article_id: str) -> None:
+        await self.execute(Q.UPDATE_INCREMENT_DISLIKES, article_id)
+
+    async def decrement_dislikes(self, article_id: str) -> None:
+        await self.execute(Q.UPDATE_DECREMENT_DISLIKES, article_id)
+
+    async def increment_shares(self, article_id: str) -> None:
+        await self.execute(Q.UPDATE_INCREMENT_SHARES, article_id)
+
     async def increment_comments(self, article_id: str) -> None:
         await self.execute(Q.UPDATE_INCREMENT_COMMENTS, article_id)
 

@@ -9,6 +9,8 @@ from models.social.model import SocialActionResult
 class SocialService:
     """Business logic for social actions (likes, bookmarks, follows). Zero SQL."""
 
+    REACTION_TYPES = ("fire", "lightbulb", "heart", "brain")
+
     def __init__(self, env, ctx=None):
         self._repo = SocialRepository(env.DB, ctx)
         self._article_repo = ArticleRepository(env.DB, ctx)
@@ -62,6 +64,145 @@ class SocialService:
         return {
             "article_id": article_id,
             "like_count": like_count,
+        }
+
+    # ── DISLIKES ───────────────────────────────────
+    async def toggle_dislike(
+        self, user_id: str, article_id: str, add: bool
+    ) -> SocialActionResult:
+        """Dislike or remove dislike from an article."""
+        if add:
+            try:
+                await self._repo.dislike(user_id, article_id)
+                await self._article_repo.increment_dislikes(article_id)
+            except Exception:
+                raise ValueError("Already disliked")
+        else:
+            await self._repo.undislike(user_id, article_id)
+            await self._article_repo.decrement_dislikes(article_id)
+
+        await self._analytics(
+            "social.disliked" if add else "social.undisliked",
+            {
+                "user_id": user_id,
+                "article_id": article_id,
+            },
+        )
+        return SocialActionResult(action="dislike", target_id=article_id, active=add)
+
+    async def check_disliked(self, user_id: str, article_id: str) -> bool:
+        return await self._repo.has_disliked(user_id, article_id)
+
+    async def get_dislike_stats(self, article_id: str) -> dict:
+        dislike_count = await self._repo.count_dislikes(article_id)
+        return {
+            "article_id": article_id,
+            "dislike_count": dislike_count,
+        }
+
+    # ── SHARES ─────────────────────────────────────
+    async def share_article(
+        self, user_id: str, article_id: str, provider: str = "linkedin"
+    ) -> dict:
+        provider_name = str(provider or "linkedin").strip().lower()
+        if provider_name != "linkedin":
+            raise ValueError("Unsupported provider")
+
+        await self._repo.share(user_id, article_id, provider_name)
+        await self._article_repo.increment_shares(article_id)
+        await self._analytics(
+            "social.shared",
+            {
+                "user_id": user_id,
+                "article_id": article_id,
+                "provider": provider_name,
+            },
+        )
+        share_count = await self._repo.count_shares(article_id)
+        return {
+            "article_id": article_id,
+            "provider": provider_name,
+            "share_count": share_count,
+        }
+
+    async def get_share_stats(self, article_id: str) -> dict:
+        share_count = await self._repo.count_shares(article_id)
+        return {
+            "article_id": article_id,
+            "share_count": share_count,
+        }
+
+    # ── REACTIONS ─────────────────────────────────
+    async def toggle_reaction(
+        self, user_id: str, article_id: str, reaction_type: str
+    ) -> SocialActionResult:
+        reaction = str(reaction_type or "").strip().lower()
+        if reaction not in self.REACTION_TYPES:
+            raise ValueError("Invalid reaction type")
+
+        already = await self._repo.has_reacted(article_id, user_id, reaction)
+        if already:
+            await self._repo.remove_reaction(article_id, user_id, reaction)
+            active = False
+        else:
+            await self._repo.add_reaction(article_id, user_id, reaction)
+            active = True
+
+        await self._analytics(
+            "social.reacted",
+            {
+                "user_id": user_id,
+                "article_id": article_id,
+                "reaction_type": reaction,
+                "active": active,
+            },
+        )
+        return SocialActionResult(
+            action=f"reaction:{reaction}",
+            target_id=article_id,
+            active=active,
+        )
+
+    async def remove_reaction(
+        self, user_id: str, article_id: str, reaction_type: str
+    ) -> SocialActionResult:
+        reaction = str(reaction_type or "").strip().lower()
+        if reaction not in self.REACTION_TYPES:
+            raise ValueError("Invalid reaction type")
+
+        await self._repo.remove_reaction(article_id, user_id, reaction)
+        await self._analytics(
+            "social.reaction_removed",
+            {
+                "user_id": user_id,
+                "article_id": article_id,
+                "reaction_type": reaction,
+            },
+        )
+        return SocialActionResult(
+            action=f"reaction:{reaction}",
+            target_id=article_id,
+            active=False,
+        )
+
+    async def get_reactions(self, article_id: str, user_id: str | None = None) -> dict:
+        counts = await self._repo.get_reaction_counts(article_id)
+        reacted = (
+            await self._repo.get_user_reactions(article_id, user_id)
+            if user_id
+            else set()
+        )
+        reactions = {
+            reaction: {
+                "count": int(counts.get(reaction, 0) or 0),
+                "userReacted": reaction in reacted,
+            }
+            for reaction in self.REACTION_TYPES
+        }
+        return {
+            "article_id": article_id,
+            "reactions": reactions,
+            "total_reactions": sum(item["count"] for item in reactions.values()),
         }
 
     # ── BOOKMARKS ──────────────────────────────────
