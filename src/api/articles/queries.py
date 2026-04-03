@@ -7,24 +7,67 @@ SELECT_BASE = (
     " FROM articles a JOIN users u ON a.author_id = u.id"
 )
 
-SELECT_PUBLISHED_LIST = (
+SELECT_PUBLISHED_LIST_NEWEST = (
     SELECT_BASE + " WHERE a.status = ? AND (? = '' OR a.content_type = ?)"
     " ORDER BY a.published_at DESC LIMIT ? OFFSET ?"
 )
 
-SELECT_PUBLISHED_BY_TAG = (
+SELECT_PUBLISHED_LIST_TRENDING = (
+    SELECT_BASE + " WHERE a.status = ? AND (? = '' OR a.content_type = ?)"
+    " ORDER BY (a.likes_count * 3 + a.comments_count * 2 + a.shares_count * 4 + a.views_count * 0.02 - a.dislikes_count * 2) DESC, a.published_at DESC LIMIT ? OFFSET ?"
+)
+
+SELECT_PUBLISHED_LIST_RECOMMENDED = (
+    SELECT_BASE + " WHERE a.status = ? AND (? = '' OR a.content_type = ?)"
+    " ORDER BY ((a.likes_count + a.comments_count + a.shares_count + 1.0) / (a.views_count + 1.0)) DESC, a.published_at DESC LIMIT ? OFFSET ?"
+)
+
+SELECT_PUBLISHED_BY_TAG_NEWEST = (
     SELECT_BASE + " JOIN article_tags at ON a.id = at.article_id"
     " JOIN tags t ON at.tag_id = t.id"
     " WHERE a.status = ? AND t.slug = ? AND (? = '' OR a.content_type = ?)"
     " ORDER BY a.published_at DESC LIMIT ? OFFSET ?"
 )
 
-SELECT_PUBLISHED_SEARCH = (
+SELECT_PUBLISHED_BY_TAG_TRENDING = (
+    SELECT_BASE + " JOIN article_tags at ON a.id = at.article_id"
+    " JOIN tags t ON at.tag_id = t.id"
+    " WHERE a.status = ? AND t.slug = ? AND (? = '' OR a.content_type = ?)"
+    " ORDER BY (a.likes_count * 3 + a.comments_count * 2 + a.shares_count * 4 + a.views_count * 0.02 - a.dislikes_count * 2) DESC, a.published_at DESC LIMIT ? OFFSET ?"
+)
+
+SELECT_PUBLISHED_BY_TAG_RECOMMENDED = (
+    SELECT_BASE + " JOIN article_tags at ON a.id = at.article_id"
+    " JOIN tags t ON at.tag_id = t.id"
+    " WHERE a.status = ? AND t.slug = ? AND (? = '' OR a.content_type = ?)"
+    " ORDER BY ((a.likes_count + a.comments_count + a.shares_count + 1.0) / (a.views_count + 1.0)) DESC, a.published_at DESC LIMIT ? OFFSET ?"
+)
+
+SELECT_PUBLISHED_SEARCH_NEWEST = (
     SELECT_BASE + " WHERE a.status = ?"
     " AND (? = '' OR a.content_type = ?)"
     " AND (a.title LIKE ? OR a.subtitle LIKE ?)"
     " ORDER BY a.published_at DESC LIMIT ? OFFSET ?"
 )
+
+SELECT_PUBLISHED_SEARCH_TRENDING = (
+    SELECT_BASE + " WHERE a.status = ?"
+    " AND (? = '' OR a.content_type = ?)"
+    " AND (a.title LIKE ? OR a.subtitle LIKE ?)"
+    " ORDER BY (a.likes_count * 3 + a.comments_count * 2 + a.shares_count * 4 + a.views_count * 0.02 - a.dislikes_count * 2) DESC, a.published_at DESC LIMIT ? OFFSET ?"
+)
+
+SELECT_PUBLISHED_SEARCH_RECOMMENDED = (
+    SELECT_BASE + " WHERE a.status = ?"
+    " AND (? = '' OR a.content_type = ?)"
+    " AND (a.title LIKE ? OR a.subtitle LIKE ?)"
+    " ORDER BY ((a.likes_count + a.comments_count + a.shares_count + 1.0) / (a.views_count + 1.0)) DESC, a.published_at DESC LIMIT ? OFFSET ?"
+)
+
+# Backward-compatible aliases used by tests/mocks and older call sites.
+SELECT_PUBLISHED_LIST = SELECT_PUBLISHED_LIST_NEWEST
+SELECT_PUBLISHED_BY_TAG = SELECT_PUBLISHED_BY_TAG_NEWEST
+SELECT_PUBLISHED_SEARCH = SELECT_PUBLISHED_SEARCH_NEWEST
 
 SELECT_BY_ID_OR_SLUG = SELECT_BASE + " WHERE a.id = ? OR a.slug = ?"
 
@@ -51,17 +94,17 @@ SELECT_TAGS_FOR_ARTICLE = (
 INSERT_ARTICLE = (
     "INSERT INTO articles"
     " (id, author_id, title, slug, subtitle, content_type, content,"
-    "  cover_image_url, read_time_minutes, status,"
-    "  last_verified_at, expires_at, seo_title, seo_description, canonical_url, og_image_url, seo_schema_type)"
-    " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    "  cover_image_url, read_time_minutes, reading_level, status,"
+    "  last_verified_at, expires_at, seo_title, seo_description, canonical_url, og_image_url, seo_schema_type, citations)"
+    " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULLIF(?, ''), ?, ?, ?, ?, ?, ?, ?, ?, NULLIF(?, ''))"
 )
 
 UPDATE_ARTICLE = (
     "UPDATE articles"
     " SET title = ?, content = ?, subtitle = ?, content_type = ?,"
-    "     cover_image_url = ?, read_time_minutes = ?,"
+    "     cover_image_url = ?, read_time_minutes = ?, reading_level = NULLIF(?, ''),"
     "     last_verified_at = ?, expires_at = ?,"
-    "     seo_title = ?, seo_description = ?, canonical_url = ?, og_image_url = ?, seo_schema_type = ?,"
+    "     seo_title = ?, seo_description = ?, canonical_url = ?, og_image_url = ?, seo_schema_type = ?, citations = NULLIF(?, ''),"
     '     updated_at = datetime("now")'
     " WHERE id = ?"
 )
@@ -153,4 +196,15 @@ SELECT_CONTENT_TYPE_EXISTS = (
     " FROM content_types"
     " WHERE slug = ? AND is_active = 1"
     " LIMIT 1"
+)
+
+# Phase 2: Related articles by sharing tags, trending sort
+SELECT_RELATED_ARTICLES = (
+    SELECT_BASE + " JOIN article_tags at ON a.id = at.article_id"
+    " JOIN article_tags at2 ON at.tag_id = at2.tag_id"
+    " WHERE at2.article_id = ? AND a.id != ? AND a.status = ?"
+    " GROUP BY a.id"
+    " ORDER BY (a.likes_count * 3 + a.comments_count * 2 + a.shares_count * 4 - a.dislikes_count * 2 + a.views_count * 0.02) DESC,"
+    "          a.published_at DESC"
+    " LIMIT ?"
 )

@@ -53,7 +53,7 @@ jobs:
     with:
       environment: ${{ needs.resolve-context.outputs.environment }}
       run_deploy: ${{ needs.resolve-context.outputs.run_deploy == 'true' }}
-      min_coverage: ${{ vars.BACKEND_MIN_COVERAGE || '80' }}
+      min_coverage: ${{ vars.BACKEND_MIN_COVERAGE || '82' }}
     secrets: inherit
 
   smoke-test:

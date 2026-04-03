@@ -133,6 +133,11 @@ class AdminRepository(BaseRepository):
     async def mark_notifications_read(self, user_id: str) -> None:
         await self.execute(Q.UPDATE_MARK_NOTIFICATIONS_READ, user_id)
 
+    async def mark_notification_read(self, user_id: str, notification_id: str) -> None:
+        await self.execute(
+            Q.UPDATE_MARK_NOTIFICATION_READ_BY_ID, user_id, notification_id
+        )
+
     async def list_content_types(self) -> list[dict]:
         rows = await self.find_all(Q.SELECT_CONTENT_TYPES_ADMIN)
         return [

@@ -205,6 +205,72 @@ class TestUsersEndpoints:
         assert response.status_code == 401
         assert response.json()["error"]["code"] == "UNAUTHORISED"
 
+    def test_get_reading_history(self, client, auth_token):
+        response = client.get(
+            "/api/users/me/reading-history?page=1&limit=10",
+            headers={"Authorization": f"Bearer {auth_token}"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "items" in data
+        assert len(data["items"]) >= 1
+        assert data["items"][0]["article_id"] == "article-001"
+
+    def test_upsert_reading_history_item(self, client, auth_token, fake_env):
+        response = client.put(
+            "/api/users/me/reading-history",
+            headers={"Authorization": f"Bearer {auth_token}"},
+            json={
+                "article_id": "article-002",
+                "slug": "risk-and-compliance-basics",
+                "title": "Risk and Compliance Basics",
+                "read_time_minutes": 11,
+                "progress": 62,
+                "last_read_at": "2026-03-18T11:00:00Z",
+            },
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["item"]["article_id"] == "article-002"
+        assert any(
+            item["article_id"] == "article-002"
+            for item in fake_env.state["reading_history"]
+        )
+
+    def test_remove_and_clear_reading_history(self, client, auth_token, fake_env):
+        remove_resp = client.delete(
+            "/api/users/me/reading-history/article-001",
+            headers={"Authorization": f"Bearer {auth_token}"},
+        )
+        assert remove_resp.status_code == 200
+        assert not any(
+            item["article_id"] == "article-001"
+            for item in fake_env.state["reading_history"]
+        )
+
+        client.put(
+            "/api/users/me/reading-history",
+            headers={"Authorization": f"Bearer {auth_token}"},
+            json={
+                "article_id": "article-003",
+                "slug": "open-banking-apis",
+                "title": "Open Banking APIs",
+                "read_time_minutes": 8,
+                "progress": 25,
+            },
+        )
+
+        clear_resp = client.delete(
+            "/api/users/me/reading-history",
+            headers={"Authorization": f"Bearer {auth_token}"},
+        )
+        assert clear_resp.status_code == 200
+        assert not any(
+            item["user_id"] == "auth-user" for item in fake_env.state["reading_history"]
+        )
+
     def test_update_profile(self, client, auth_token, fake_env):
         """PUT /api/users/me"""
         response = client.put(

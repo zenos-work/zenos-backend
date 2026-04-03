@@ -1,3 +1,4 @@
+import json
 from typing import Optional
 from db.repository import BaseRepository
 from api.articles import queries as Q
@@ -24,12 +25,33 @@ class ArticleRepository(BaseRepository):
         tag: Optional[str] = None,
         search: Optional[str] = None,
         content_type: Optional[str] = None,
+        sort: Optional[str] = None,
     ) -> PaginatedResponse:
         offset = (page - 1) * limit
         content_type_param = content_type or ""
+        sort_key = (sort or "newest").lower()
+        if sort_key not in {"newest", "trending", "recommended"}:
+            sort_key = "newest"
+
+        list_query = {
+            "newest": Q.SELECT_PUBLISHED_LIST_NEWEST,
+            "trending": Q.SELECT_PUBLISHED_LIST_TRENDING,
+            "recommended": Q.SELECT_PUBLISHED_LIST_RECOMMENDED,
+        }[sort_key]
+        by_tag_query = {
+            "newest": Q.SELECT_PUBLISHED_BY_TAG_NEWEST,
+            "trending": Q.SELECT_PUBLISHED_BY_TAG_TRENDING,
+            "recommended": Q.SELECT_PUBLISHED_BY_TAG_RECOMMENDED,
+        }[sort_key]
+        search_query = {
+            "newest": Q.SELECT_PUBLISHED_SEARCH_NEWEST,
+            "trending": Q.SELECT_PUBLISHED_SEARCH_TRENDING,
+            "recommended": Q.SELECT_PUBLISHED_SEARCH_RECOMMENDED,
+        }[sort_key]
+
         if tag:
             rows = await self.find_all(
-                Q.SELECT_PUBLISHED_BY_TAG,
+                by_tag_query,
                 "PUBLISHED",
                 tag,
                 content_type_param,
@@ -39,7 +61,7 @@ class ArticleRepository(BaseRepository):
             )
         elif search:
             rows = await self.find_all(
-                Q.SELECT_PUBLISHED_SEARCH,
+                search_query,
                 "PUBLISHED",
                 content_type_param,
                 content_type_param,
@@ -50,7 +72,7 @@ class ArticleRepository(BaseRepository):
             )
         else:
             rows = await self.find_all(
-                Q.SELECT_PUBLISHED_LIST,
+                list_query,
                 "PUBLISHED",
                 content_type_param,
                 content_type_param,
@@ -130,6 +152,17 @@ class ArticleRepository(BaseRepository):
         """Returns raw row with id, author_id, status — for transition checks."""
         return await self.find_one(Q.SELECT_STATUS_BY_ID, article_id)
 
+    async def find_related(self, article_id: str, limit: int = 5) -> list:
+        """Find related articles by shared tags, sorted by trending score."""
+        rows = await self.find_all(
+            Q.SELECT_RELATED_ARTICLES,
+            article_id,
+            article_id,
+            "PUBLISHED",
+            limit,
+        )
+        return self.map_many(rows, Article)
+
     async def _fetch_tags(self, article_id: str) -> list:
         rows = await self.find_all(Q.SELECT_TAGS_FOR_ARTICLE, article_id)
         return self.map_many(rows, Tag)
@@ -142,6 +175,15 @@ class ArticleRepository(BaseRepository):
             return ""
         text = str(value).strip()
         return text
+
+    @staticmethod
+    def _optional_json_array(value: Optional[list[str]]) -> str:
+        if not value:
+            return ""
+        cleaned = [str(item).strip() for item in value if str(item).strip()]
+        if not cleaned:
+            return ""
+        return json.dumps(cleaned)
 
     async def insert(
         self,
@@ -162,6 +204,8 @@ class ArticleRepository(BaseRepository):
         canonical_url: Optional[str],
         og_image_url: Optional[str],
         seo_schema_type: Optional[str],
+        reading_level: Optional[str] = None,
+        citations: Optional[list[str]] = None,
     ) -> Article:
         await self.execute(
             Q.INSERT_ARTICLE,
@@ -174,6 +218,7 @@ class ArticleRepository(BaseRepository):
             content,
             self._optional_text(cover_image_url),
             read_time,
+            self._optional_text(reading_level),
             status,
             self._optional_text(last_verified_at),
             self._optional_text(expires_at),
@@ -182,6 +227,7 @@ class ArticleRepository(BaseRepository):
             self._optional_text(canonical_url),
             self._optional_text(og_image_url),
             self._optional_text(seo_schema_type or "Article"),
+            self._optional_json_array(citations),
         )
         row = await self.find_one(Q.SELECT_BY_ID_OR_SLUG, aid, aid)
         article = self.map_one(row, Article)
@@ -204,6 +250,8 @@ class ArticleRepository(BaseRepository):
         canonical_url: Optional[str],
         og_image_url: Optional[str],
         seo_schema_type: Optional[str],
+        reading_level: Optional[str] = None,
+        citations: Optional[list[str]] = None,
     ) -> Article:
         await self.execute(
             Q.UPDATE_ARTICLE,
@@ -213,6 +261,7 @@ class ArticleRepository(BaseRepository):
             self._optional_text(content_type or "article"),
             self._optional_text(cover_image_url),
             read_time,
+            self._optional_text(reading_level),
             self._optional_text(last_verified_at),
             self._optional_text(expires_at),
             self._optional_text(seo_title),
@@ -220,6 +269,7 @@ class ArticleRepository(BaseRepository):
             self._optional_text(canonical_url),
             self._optional_text(og_image_url),
             self._optional_text(seo_schema_type or "Article"),
+            self._optional_json_array(citations),
             article_id,
         )
         row = await self.find_one(Q.SELECT_BY_ID_OR_SLUG, article_id, article_id)

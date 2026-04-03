@@ -2,6 +2,8 @@
 
 import json
 import uuid
+from urllib.parse import parse_qs, urlparse
+
 from js import Headers, Response
 
 from auth.google import exchange_code
@@ -9,11 +11,125 @@ from auth.jwt_handler import create_token, verify_token
 from models.base import row_get
 from utils.helpers import cors_headers, error, json_resp, resolve_allowed_origin
 
+ALLOWED_TEST_ROLES = ("READER", "AUTHOR", "APPROVER", "SUPERADMIN")
+
 
 def _body_get(data, key: str):
     if isinstance(data, dict):
         return data.get(key)
     return getattr(data, key, None)
+
+
+def _is_test_auth_enabled(env) -> bool:
+    env_name = str(getattr(env, "ENVIRONMENT", "production")).lower()
+    enabled = str(getattr(env, "E2E_TEST_AUTH_ENABLED", "false")).lower()
+    return env_name == "development" and enabled in ("1", "true", "yes", "on")
+
+
+async def _issue_test_tokens(request, env):
+    if not _is_test_auth_enabled(env):
+        return error("Not found", 404, env=env, request=request)
+
+    expected_secret = str(getattr(env, "E2E_TEST_AUTH_SECRET", ""))
+    provided_secret = request.headers.get("x-e2e-auth-secret", "")
+    if expected_secret and provided_secret != expected_secret:
+        return error("Unauthorised", 401, env=env, request=request)
+
+    data = await request.json()
+    role = str(_body_get(data, "role") or "AUTHOR").strip().upper()
+    if role not in ALLOWED_TEST_ROLES:
+        return error(
+            f"Invalid role: {role}. Must be one of {ALLOWED_TEST_ROLES}",
+            422,
+            details={"code": "VALIDATION_FAILED"},
+            env=env,
+            request=request,
+        )
+
+    email = (
+        str(_body_get(data, "email") or f"e2e.{role.lower()}@zenos.local")
+        .strip()
+        .lower()
+    )
+    name = str(_body_get(data, "name") or f"E2E {role.title()}").strip()
+    google_id = str(_body_get(data, "google_id") or f"e2e-{role.lower()}").strip()
+
+    user_id = str(uuid.uuid4())
+    await (
+        env.DB.prepare(
+            "INSERT INTO users (id, email, name, avatar_url, google_id, role, terms_accepted_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, datetime('now'))"
+            " ON CONFLICT(email) DO UPDATE SET"
+            " name=excluded.name,"
+            " google_id=excluded.google_id,"
+            " role=excluded.role,"
+            " terms_accepted_at=COALESCE(users.terms_accepted_at, datetime('now')),"
+            " updated_at=datetime('now')"
+        )
+        .bind(
+            user_id,
+            email,
+            name,
+            "",
+            google_id,
+            role,
+        )
+        .run()
+    )
+
+    row = (
+        await env.DB.prepare(
+            "SELECT id, email, name, role, avatar_url, terms_accepted_at"
+            " FROM users WHERE email = ?"
+        )
+        .bind(email)
+        .first()
+    )
+    if not row:
+        return error(
+            "Failed to provision test user",
+            500,
+            env=env,
+            request=request,
+        )
+
+    access_token = create_token(
+        {
+            "sub": row_get(row, "id"),
+            "email": row_get(row, "email"),
+            "role": row_get(row, "role"),
+        },
+        env.JWT_SECRET,
+        expires_in=900,
+    )
+    refresh_token = create_token(
+        {"sub": row_get(row, "id"), "type": "refresh"},
+        env.JWT_SECRET,
+        expires_in=604800,
+    )
+
+    await env.SESSIONS.put(
+        f"refresh:{row_get(row, 'id')}",
+        refresh_token,
+        expiration_ttl=604800,
+    )
+
+    return json_resp(
+        {
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "user": {
+                "id": row_get(row, "id"),
+                "email": row_get(row, "email"),
+                "name": row_get(row, "name"),
+                "role": row_get(row, "role"),
+                "avatar_url": row_get(row, "avatar_url"),
+                "terms_accepted_at": row_get(row, "terms_accepted_at"),
+            },
+        },
+        env=env,
+        request=request,
+    )
 
 
 async def handle_auth(request, env, path: str):
@@ -32,12 +148,20 @@ async def handle_auth(request, env, path: str):
 
         # GET /auth/google/login
         if path == "/auth/google/login":
+            request_url = str(getattr(request, "url", ""))
+            parsed = urlparse(request_url) if request_url else None
+            query = parse_qs(parsed.query) if parsed else {}
+            intent = (query.get("intent", ["signin"])[0] or "signin").lower()
+            if intent not in {"signin", "signup"}:
+                intent = "signin"
+
             redirect_url = (
                 "https://accounts.google.com/o/oauth2/v2/auth"
                 f"?client_id={env.GOOGLE_CLIENT_ID}"
                 "&response_type=code"
                 "&scope=openid%20email%20profile"
                 f"&redirect_uri={env.FRONTEND_URL}/auth/google/callback"
+                f"&state={intent}"
             )
             headers = Headers.new(
                 [
@@ -50,12 +174,22 @@ async def handle_auth(request, env, path: str):
             )
             return Response.new("", status=302, headers=headers)
 
+        # POST /auth/test/token (development only)
+        if path == "/auth/test/token":
+            if request.method != "POST":
+                return error("Method not allowed", 405, env=env, request=request)
+            return await _issue_test_tokens(request, env)
+
         # POST /auth/google/callback
         if path == "/auth/google/callback":
             data = await request.json()
             code = _body_get(data, "code")
             if not code:
                 return error("Missing code", 400, env=env, request=request)
+
+            intent = (_body_get(data, "intent") or "signin").lower()
+            if intent not in {"signin", "signup"}:
+                intent = "signin"
 
             user_info = await exchange_code(code, env)
             if not user_info or "error" in user_info:
@@ -81,6 +215,18 @@ async def handle_auth(request, env, path: str):
                 .first()
             )
             is_new_user = existing_user is None
+
+            if intent == "signin" and is_new_user:
+                return error(
+                    "No account found for this Google user. Please sign up first.",
+                    404,
+                    details={
+                        "code": "USER_NOT_FOUND",
+                        "signup_required": True,
+                    },
+                    env=env,
+                    request=request,
+                )
 
             user_id = str(uuid.uuid4())
             await (

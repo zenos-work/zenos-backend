@@ -66,6 +66,9 @@ class DummyRepo:
     async def mark_notifications_read(self, user_id):
         return None
 
+    async def mark_notification_read(self, user_id, notification_id):
+        return None
+
     async def insert_notification(self, *args, **kwargs):
         return None
 

@@ -69,6 +69,71 @@ class UserRepository(BaseRepository):
     ) -> None:
         await self.execute(Q.UPDATE_PREFS, topics, email_notifs, theme, user_id)
 
+    async def find_reading_history(
+        self, user_id: str, limit: int, offset: int
+    ) -> list[dict]:
+        from models.base import row_get
+
+        rows = await self.find_all(
+            Q.SELECT_READING_HISTORY_BY_USER, user_id, limit, offset
+        )
+        return [
+            {
+                "user_id": row_get(row, "user_id"),
+                "article_id": row_get(row, "article_id"),
+                "slug": row_get(row, "slug"),
+                "title": row_get(row, "title"),
+                "subtitle": row_get(row, "subtitle"),
+                "author_name": row_get(row, "author_name"),
+                "cover_image_url": row_get(row, "cover_image_url"),
+                "read_time_minutes": int(row_get(row, "read_time_minutes", 0) or 0),
+                "progress": int(row_get(row, "progress", 0) or 0),
+                "last_read_at": row_get(row, "last_read_at"),
+                "created_at": row_get(row, "created_at"),
+                "updated_at": row_get(row, "updated_at"),
+            }
+            for row in rows
+        ]
+
+    async def count_reading_history(self, user_id: str) -> int:
+        from models.base import row_get
+
+        row = await self.find_one(Q.COUNT_READING_HISTORY_BY_USER, user_id)
+        return row_get(row, "c", 0)
+
+    async def upsert_reading_history_item(
+        self,
+        user_id: str,
+        article_id: str,
+        slug: str,
+        title: str,
+        subtitle: Optional[str],
+        author_name: Optional[str],
+        cover_image_url: Optional[str],
+        read_time_minutes: int,
+        progress: int,
+        last_read_at: Optional[str],
+    ) -> None:
+        await self.execute(
+            Q.UPSERT_READING_HISTORY_ITEM,
+            user_id,
+            article_id,
+            slug,
+            title,
+            subtitle,
+            author_name,
+            cover_image_url,
+            read_time_minutes,
+            progress,
+            last_read_at or "",
+        )
+
+    async def delete_reading_history_item(self, user_id: str, article_id: str) -> None:
+        await self.execute(Q.DELETE_READING_HISTORY_ITEM, user_id, article_id)
+
+    async def clear_reading_history(self, user_id: str) -> None:
+        await self.execute(Q.DELETE_READING_HISTORY_BY_USER, user_id)
+
     async def ban(self, user_id: str) -> None:
         await self.execute(Q.UPDATE_BAN, user_id)
 

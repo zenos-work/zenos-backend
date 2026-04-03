@@ -237,6 +237,62 @@ class FakeUserService:
     async def self_upgrade_to_author(self, user_id):
         return {"user_id": user_id, "role": "AUTHOR"}
 
+    async def list_reading_history(self, user_id, page=1, limit=30):
+        items = [
+            item for item in self.state["reading_history"] if item["user_id"] == user_id
+        ]
+        items.sort(key=lambda item: item.get("last_read_at") or "", reverse=True)
+        start = (max(1, page) - 1) * limit
+        page_items = items[start : start + limit]
+        return {
+            "items": page_items,
+            "pagination": {
+                "page": page,
+                "limit": limit,
+                "total": len(items),
+                "pages": (len(items) + limit - 1) // limit if limit else 1,
+                "has_more": start + limit < len(items),
+            },
+        }
+
+    async def upsert_reading_history_item(self, user_id, payload):
+        record = {
+            "user_id": user_id,
+            "id": payload["article_id"],
+            "article_id": payload["article_id"],
+            "slug": payload["slug"],
+            "title": payload["title"],
+            "subtitle": payload.get("subtitle"),
+            "author_name": payload.get("author_name"),
+            "cover_image_url": payload.get("cover_image_url"),
+            "read_time_minutes": payload.get("read_time_minutes", 0),
+            "progress": payload.get("progress", 0),
+            "last_read_at": payload.get("last_read_at") or "2026-03-18T12:00:00Z",
+        }
+
+        for index, item in enumerate(self.state["reading_history"]):
+            if (
+                item["user_id"] == user_id
+                and item["article_id"] == record["article_id"]
+            ):
+                self.state["reading_history"][index] = record
+                return record
+
+        self.state["reading_history"].append(record)
+        return record
+
+    async def remove_reading_history_item(self, user_id, article_id):
+        self.state["reading_history"] = [
+            item
+            for item in self.state["reading_history"]
+            if not (item["user_id"] == user_id and item["article_id"] == article_id)
+        ]
+
+    async def clear_reading_history(self, user_id):
+        self.state["reading_history"] = [
+            item for item in self.state["reading_history"] if item["user_id"] != user_id
+        ]
+
 
 class FakeMediaService:
     def __init__(self, env, ctx):
@@ -277,6 +333,21 @@ class FakeEnv:
             "users": _build_users(),
             "profile_updates": [],
             "uploads": [],
+            "reading_history": [
+                {
+                    "user_id": "auth-user",
+                    "id": "article-001",
+                    "article_id": "article-001",
+                    "slug": "payments-fundamentals",
+                    "title": "Payments Fundamentals",
+                    "subtitle": "From rails to settlement.",
+                    "author_name": "Alice Author",
+                    "cover_image_url": None,
+                    "read_time_minutes": 7,
+                    "progress": 45,
+                    "last_read_at": "2026-03-18T10:30:00Z",
+                }
+            ],
         }
         self.DB = FakeDB(self.state)
 

@@ -86,7 +86,7 @@ async def handle_social(request, env, path, method, query, ctx):
             return error(str(e), 404)
 
     # ── SHARES ─────────────────────────────────────
-    # POST /api/social/shares/:article_id — Record a share event (LinkedIn-only for now)
+    # POST /api/social/shares/:article_id — Record a share event (linkedin/x/facebook)
     if action == "shares" and target and method == "POST":
         try:
             body = await request.json()
