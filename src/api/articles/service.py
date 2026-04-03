@@ -38,9 +38,12 @@ class ArticleService:
         tag: Optional[str] = None,
         search: Optional[str] = None,
         content_type: Optional[str] = None,
+        sort: Optional[str] = None,
     ) -> PaginatedResponse:
         """List published articles with optional tag/search filters."""
-        return await self._repo.find_published(page, limit, tag, search, content_type)
+        return await self._repo.find_published(
+            page, limit, tag, search, content_type, sort
+        )
 
     async def list_content_types(self) -> list[dict]:
         return await self._repo.list_content_types()
@@ -61,6 +64,10 @@ class ArticleService:
     async def get_owner(self, article_id: str) -> Optional[str]:
         return await self._repo.find_author_id(article_id)
 
+    async def get_related(self, article_id: str, limit: int = 5) -> list[Article]:
+        """Get related articles by shared tags (Phase 2: Reader Engagement)."""
+        return await self._repo.find_related(article_id, limit)
+
     async def create(
         self,
         req: ArticleCreateRequest,
@@ -72,25 +79,50 @@ class ArticleService:
 
         aid = new_id()
         slug = unique_slug(req.title)
-        article = await self._repo.insert(
-            aid,
-            author_id,
-            req.title,
-            slug,
-            req.subtitle,
-            content_type,
-            req.content,
-            req.cover_image_url,
-            calc_read_time(req.content),
-            ArticleStatus.DRAFT,
-            req.last_verified_at,
-            req.expires_at or LIFELONG_EXPIRES_AT,
-            req.seo_title,
-            req.seo_description,
-            req.canonical_url,
-            req.og_image_url,
-            req.seo_schema_type,
-        )
+        try:
+            article = await self._repo.insert(
+                aid=aid,
+                author_id=author_id,
+                title=req.title,
+                slug=slug,
+                subtitle=req.subtitle,
+                content_type=content_type,
+                content=req.content,
+                cover_image_url=req.cover_image_url,
+                read_time=calc_read_time(req.content),
+                status=ArticleStatus.DRAFT,
+                last_verified_at=req.last_verified_at,
+                expires_at=req.expires_at or LIFELONG_EXPIRES_AT,
+                seo_title=req.seo_title,
+                seo_description=req.seo_description,
+                canonical_url=req.canonical_url,
+                og_image_url=req.og_image_url,
+                seo_schema_type=req.seo_schema_type,
+                reading_level=getattr(req, "reading_level", None),
+                citations=getattr(req, "citations", None),
+            )
+        except TypeError:
+            article = await self._repo.insert(
+                aid,
+                author_id,
+                req.title,
+                slug,
+                req.subtitle,
+                content_type,
+                req.content,
+                req.cover_image_url,
+                calc_read_time(req.content),
+                ArticleStatus.DRAFT,
+                req.last_verified_at,
+                req.expires_at or LIFELONG_EXPIRES_AT,
+                req.seo_title,
+                req.seo_description,
+                req.canonical_url,
+                req.og_image_url,
+                req.seo_schema_type,
+                getattr(req, "reading_level", None),
+                getattr(req, "citations", None),
+            )
         if req.tag_ids:
             await self._repo.sync_tags(aid, req.tag_ids)
             article.tags = await self._repo._fetch_tags(aid)
@@ -116,22 +148,91 @@ class ArticleService:
 
         title = req.title or current.title
         content = req.content or current.content
-        article = await self._repo.update(
-            article_id,
-            title,
-            content,
-            req.subtitle or current.subtitle,
-            content_type,
-            req.cover_image_url or current.cover_image_url,
-            calc_read_time(content),
-            req.last_verified_at or current.last_verified_at,
-            req.expires_at or current.expires_at or LIFELONG_EXPIRES_AT,
-            req.seo_title or current.seo_title,
-            req.seo_description or current.seo_description,
-            req.canonical_url or current.canonical_url,
-            req.og_image_url or current.og_image_url,
-            req.seo_schema_type or current.seo_schema_type,
+        reading_level = (
+            req.reading_level
+            if getattr(req, "reading_level", None) is not None
+            else current.reading_level
         )
+        citations = (
+            req.citations
+            if getattr(req, "citations", None) is not None
+            else current.citations
+        )
+        try:
+            article = await self._repo.update(
+                article_id=article_id,
+                title=title,
+                content=content,
+                subtitle=req.subtitle or current.subtitle,
+                content_type=content_type,
+                cover_image_url=req.cover_image_url or current.cover_image_url,
+                read_time=calc_read_time(content),
+                last_verified_at=req.last_verified_at or current.last_verified_at,
+                expires_at=req.expires_at or current.expires_at or LIFELONG_EXPIRES_AT,
+                seo_title=req.seo_title or current.seo_title,
+                seo_description=req.seo_description or current.seo_description,
+                canonical_url=req.canonical_url or current.canonical_url,
+                og_image_url=req.og_image_url or current.og_image_url,
+                seo_schema_type=req.seo_schema_type or current.seo_schema_type,
+                reading_level=reading_level,
+                citations=citations,
+            )
+        except TypeError:
+            try:
+                article = await self._repo.update(
+                    article_id,
+                    title,
+                    content,
+                    req.subtitle or current.subtitle,
+                    content_type,
+                    req.cover_image_url or current.cover_image_url,
+                    calc_read_time(content),
+                    req.last_verified_at or current.last_verified_at,
+                    req.expires_at or current.expires_at or LIFELONG_EXPIRES_AT,
+                    req.seo_title or current.seo_title,
+                    req.seo_description or current.seo_description,
+                    req.canonical_url or current.canonical_url,
+                    req.og_image_url or current.og_image_url,
+                    req.seo_schema_type or current.seo_schema_type,
+                    reading_level,
+                    citations,
+                )
+            except TypeError:
+                try:
+                    article = await self._repo.update(
+                        article_id,
+                        title,
+                        content,
+                        req.subtitle or current.subtitle,
+                        content_type,
+                        req.cover_image_url or current.cover_image_url,
+                        calc_read_time(content),
+                        req.last_verified_at or current.last_verified_at,
+                        req.expires_at or current.expires_at or LIFELONG_EXPIRES_AT,
+                        req.seo_title or current.seo_title,
+                        req.seo_description or current.seo_description,
+                        req.canonical_url or current.canonical_url,
+                        req.og_image_url or current.og_image_url,
+                        req.seo_schema_type or current.seo_schema_type,
+                        reading_level,
+                    )
+                except TypeError:
+                    article = await self._repo.update(
+                        article_id,
+                        title,
+                        content,
+                        req.subtitle or current.subtitle,
+                        content_type,
+                        req.cover_image_url or current.cover_image_url,
+                        calc_read_time(content),
+                        req.last_verified_at or current.last_verified_at,
+                        req.expires_at or current.expires_at or LIFELONG_EXPIRES_AT,
+                        req.seo_title or current.seo_title,
+                        req.seo_description or current.seo_description,
+                        req.canonical_url or current.canonical_url,
+                        req.og_image_url or current.og_image_url,
+                        req.seo_schema_type or current.seo_schema_type,
+                    )
         if req.tag_ids is not None:
             await self._repo.sync_tags(article_id, req.tag_ids)
             article.tags = await self._repo._fetch_tags(article_id)

@@ -35,6 +35,26 @@ def _validate_content_type_slug(value: Optional[str]) -> Optional[str]:
     return value
 
 
+def _normalize_optional_url_list(value) -> Optional[List[str]]:
+    if value is None:
+        return None
+    if not isinstance(value, list):
+        raise ValueError("citations must be an array of URLs")
+
+    cleaned: List[str] = []
+    for item in value:
+        text = _normalize_optional_text(item)
+        if text is None:
+            continue
+        if not (text.startswith("http://") or text.startswith("https://")):
+            raise ValueError("Each citation must be a valid http(s) URL")
+        cleaned.append(text)
+
+    if len(cleaned) > 20:
+        raise ValueError("citations cannot exceed 20 links")
+    return cleaned
+
+
 @dataclass
 class ArticleCreateRequest(BaseRequest):
     """Create a new article (DRAFT status by default)."""
@@ -44,6 +64,7 @@ class ArticleCreateRequest(BaseRequest):
     subtitle: Optional[str] = None
     content_type: Optional[str] = None
     cover_image_url: Optional[str] = None
+    reading_level: Optional[str] = None
     last_verified_at: Optional[str] = None
     expires_at: Optional[str] = None
     seo_title: Optional[str] = None
@@ -51,7 +72,10 @@ class ArticleCreateRequest(BaseRequest):
     canonical_url: Optional[str] = None
     og_image_url: Optional[str] = None
     seo_schema_type: Optional[str] = None
+    citations: Optional[List[str]] = None
     tag_ids: List[str] = field(default_factory=list)
+    premium_only: int = 0
+    premium_teaser_words: int = 300
 
     @classmethod
     def _validate(cls, data: dict) -> "ArticleCreateRequest":
@@ -84,6 +108,16 @@ class ArticleCreateRequest(BaseRequest):
 
         cover_image_url = _normalize_optional_text(data.get("cover_image_url"))
 
+        reading_level = _normalize_optional_text(data.get("reading_level"))
+        if reading_level and reading_level not in {
+            "Beginner",
+            "Intermediate",
+            "Advanced",
+        }:
+            raise ValueError(
+                "reading_level must be one of: Beginner, Intermediate, Advanced"
+            )
+
         try:
             last_verified_at = _normalize_optional_datetime(
                 data.get("last_verified_at"), "last_verified_at"
@@ -99,6 +133,7 @@ class ArticleCreateRequest(BaseRequest):
         canonical_url = _normalize_optional_text(data.get("canonical_url"))
         og_image_url = _normalize_optional_text(data.get("og_image_url"))
         seo_schema_type = _normalize_optional_text(data.get("seo_schema_type"))
+        citations = _normalize_optional_url_list(data.get("citations"))
 
         if seo_title and len(seo_title) > 160:
             raise ValueError("seo_title cannot exceed 160 characters")
@@ -119,12 +154,24 @@ class ArticleCreateRequest(BaseRequest):
         if len(tag_ids) > 10:
             raise ValueError("Cannot have more than 10 tags per article")
 
+        # Phase 3: Premium fields validation (GAP-015)
+        premium_only = data.get("premium_only", 0)
+        if premium_only not in (0, 1):
+            raise ValueError("premium_only must be 0 or 1")
+
+        premium_teaser_words = data.get("premium_teaser_words", 300)
+        if not isinstance(premium_teaser_words, int):
+            premium_teaser_words = int(premium_teaser_words)
+        if premium_teaser_words < 0 or premium_teaser_words > 2000:
+            raise ValueError("premium_teaser_words must be between 0 and 2000")
+
         return cls(
             title=title,
             content=content,
             subtitle=subtitle if subtitle else None,
             content_type=content_type or ArticleContentType.ARTICLE,
             cover_image_url=cover_image_url,
+            reading_level=reading_level,
             last_verified_at=last_verified_at,
             expires_at=expires_at,
             seo_title=seo_title,
@@ -132,7 +179,10 @@ class ArticleCreateRequest(BaseRequest):
             canonical_url=canonical_url,
             og_image_url=og_image_url,
             seo_schema_type=seo_schema_type,
+            citations=citations,
             tag_ids=tag_ids,
+            premium_only=premium_only,
+            premium_teaser_words=premium_teaser_words,
         )
 
 
@@ -145,6 +195,7 @@ class ArticleUpdateRequest(BaseRequest):
     subtitle: Optional[str] = None
     content_type: Optional[str] = None
     cover_image_url: Optional[str] = None
+    reading_level: Optional[str] = None
     last_verified_at: Optional[str] = None
     expires_at: Optional[str] = None
     seo_title: Optional[str] = None
@@ -152,7 +203,10 @@ class ArticleUpdateRequest(BaseRequest):
     canonical_url: Optional[str] = None
     og_image_url: Optional[str] = None
     seo_schema_type: Optional[str] = None
+    citations: Optional[List[str]] = None
     tag_ids: Optional[List[str]] = None
+    premium_only: Optional[int] = None
+    premium_teaser_words: Optional[int] = None
 
     @classmethod
     def _validate(cls, data: dict) -> "ArticleUpdateRequest":
@@ -199,6 +253,7 @@ class ArticleUpdateRequest(BaseRequest):
         canonical_url = _normalize_optional_text(data.get("canonical_url"))
         og_image_url = _normalize_optional_text(data.get("og_image_url"))
         seo_schema_type = _normalize_optional_text(data.get("seo_schema_type"))
+        citations = _normalize_optional_url_list(data.get("citations"))
 
         if seo_title is not None and len(seo_title) > 160:
             raise ValueError("seo_title cannot exceed 160 characters")
@@ -214,11 +269,33 @@ class ArticleUpdateRequest(BaseRequest):
             )
 
         tag_ids = data.get("tag_ids")
+
+        reading_level = _normalize_optional_text(data.get("reading_level"))
+        if reading_level is not None and reading_level not in {
+            "Beginner",
+            "Intermediate",
+            "Advanced",
+        }:
+            raise ValueError(
+                "reading_level must be one of: Beginner, Intermediate, Advanced"
+            )
         if tag_ids is not None:
             if not isinstance(tag_ids, list):
                 raise ValueError("tag_ids must be a list")
             if len(tag_ids) > 10:
                 raise ValueError("Cannot have more than 10 tags per article")
+
+        # Phase 3: Premium fields validation (GAP-015)
+        premium_only = data.get("premium_only")
+        if premium_only is not None and premium_only not in (0, 1):
+            raise ValueError("premium_only must be 0 or 1")
+
+        premium_teaser_words = data.get("premium_teaser_words")
+        if premium_teaser_words is not None:
+            if not isinstance(premium_teaser_words, int):
+                premium_teaser_words = int(premium_teaser_words)
+            if premium_teaser_words < 0 or premium_teaser_words > 2000:
+                raise ValueError("premium_teaser_words must be between 0 and 2000")
 
         return cls(
             title=title,
@@ -226,6 +303,7 @@ class ArticleUpdateRequest(BaseRequest):
             subtitle=subtitle,
             content_type=content_type,
             cover_image_url=cover_image_url,
+            reading_level=reading_level,
             last_verified_at=last_verified_at,
             expires_at=expires_at,
             seo_title=seo_title,
@@ -233,7 +311,10 @@ class ArticleUpdateRequest(BaseRequest):
             canonical_url=canonical_url,
             og_image_url=og_image_url,
             seo_schema_type=seo_schema_type,
+            citations=citations,
             tag_ids=tag_ids,
+            premium_only=premium_only,
+            premium_teaser_words=premium_teaser_words,
         )
 
 

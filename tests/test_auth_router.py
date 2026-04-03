@@ -45,16 +45,22 @@ class FakePrepared:
     async def run(self):
         if "INSERT INTO users" in self.sql:
             user_id, email, name, avatar_url, google_id, role = self.params
-            existing = self.db.by_google_id.get(google_id)
+            existing = self.db.by_google_id.get(google_id) or self.db.by_email.get(
+                email
+            )
             if existing:
                 existing["email"] = email
                 existing["name"] = name
                 # Keep custom avatar if already present; use Google avatar only when empty.
                 if not existing.get("avatar_url"):
                     existing["avatar_url"] = avatar_url
+                existing["google_id"] = google_id
                 existing["role"] = role
+                self.db.by_email[email] = existing
+                self.db.by_google_id[google_id] = existing
+                self.db.by_id[existing["id"]] = existing
             else:
-                self.db.by_google_id[google_id] = {
+                created = {
                     "id": user_id,
                     "email": email,
                     "name": name,
@@ -63,6 +69,9 @@ class FakePrepared:
                     "role": role,
                     "terms_accepted_at": None,
                 }
+                self.db.by_google_id[google_id] = created
+                self.db.by_email[email] = created
+                self.db.by_id[user_id] = created
         return None
 
     async def first(self):
@@ -72,6 +81,9 @@ class FakePrepared:
         if "WHERE google_id = ?" in self.sql:
             google_id = self.params[0]
             return self.db.by_google_id.get(google_id)
+        if "WHERE email = ?" in self.sql:
+            email = self.params[0]
+            return self.db.by_email.get(email)
         if "FROM user_preferences WHERE user_id = ?" in self.sql:
             user_id = self.params[0]
             return self.db.prefs_by_user_id.get(user_id)
@@ -84,6 +96,7 @@ class FakePrepared:
 class FakeDB:
     def __init__(self):
         self.by_google_id = {}
+        self.by_email = {}
         self.prefs_by_user_id = {}
         self.by_id = {
             "user-123": {
@@ -101,6 +114,9 @@ class FakeEnv:
     GOOGLE_CLIENT_ID = "google-client-id"
     FRONTEND_URL = "http://localhost:5173"
     JWT_SECRET = "test-secret"
+    ENVIRONMENT = "development"
+    E2E_TEST_AUTH_ENABLED = "true"
+    E2E_TEST_AUTH_SECRET = "e2e-secret"
 
     def __init__(self):
         self.DB = FakeDB()
@@ -138,6 +154,18 @@ async def test_google_login_redirect():
     assert response.status_code == 302
     assert "accounts.google.com" in response.headers["Location"]
     assert "client_id=google-client-id" in response.headers["Location"]
+    assert "state=signin" in response.headers["Location"]
+
+
+@pytest.mark.asyncio
+async def test_google_login_redirect_with_signup_intent_sets_state():
+    env = FakeEnv()
+    request = DummyRequest(method="GET", path="/auth/google/login?intent=signup")
+
+    response = await auth_router.handle_auth(request, env, "/auth/google/login")
+
+    assert response.status_code == 302
+    assert "state=signup" in response.headers["Location"]
 
 
 @pytest.mark.asyncio
@@ -191,7 +219,7 @@ async def test_google_callback_success_returns_tokens_and_user(monkeypatch):
     request = DummyRequest(
         method="POST",
         path="/auth/google/callback",
-        body={"code": "good-code"},
+        body={"code": "good-code", "intent": "signup"},
     )
 
     response = await auth_router.handle_auth(request, env, "/auth/google/callback")
@@ -203,6 +231,33 @@ async def test_google_callback_success_returns_tokens_and_user(monkeypatch):
     assert body["user"]["email"] == "alice@example.com"
     assert body["user"]["is_new_user"] is True
     assert body["user"]["needs_topic_preferences"] is True
+
+
+@pytest.mark.asyncio
+async def test_google_callback_signin_unknown_user_returns_user_not_found(monkeypatch):
+    async def fake_exchange_code(code, env):
+        return {
+            "id": "google-unknown",
+            "email": "new-user@example.com",
+            "name": "New User",
+            "picture": "https://img.example.com/new-user.jpg",
+        }
+
+    monkeypatch.setattr(auth_router, "exchange_code", fake_exchange_code)
+
+    env = FakeEnv()
+    request = DummyRequest(
+        method="POST",
+        path="/auth/google/callback",
+        body={"code": "good-code", "intent": "signin"},
+    )
+
+    response = await auth_router.handle_auth(request, env, "/auth/google/callback")
+
+    assert response.status_code == 404
+    body = response.json()
+    assert body["error"]["code"] == "USER_NOT_FOUND"
+    assert body["error"]["signup_required"] is True
 
 
 @pytest.mark.asyncio
@@ -343,3 +398,70 @@ async def test_unknown_auth_path_returns_404():
 
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "NOT_FOUND"
+
+
+@pytest.mark.asyncio
+async def test_test_token_requires_enabled_flag():
+    env = FakeEnv()
+    env.E2E_TEST_AUTH_ENABLED = "false"
+    request = DummyRequest(
+        method="POST",
+        path="/auth/test/token",
+        headers={"x-e2e-auth-secret": "e2e-secret"},
+        body={"role": "AUTHOR"},
+    )
+
+    response = await auth_router.handle_auth(request, env, "/auth/test/token")
+
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_test_token_requires_secret_when_configured():
+    env = FakeEnv()
+    request = DummyRequest(
+        method="POST",
+        path="/auth/test/token",
+        body={"role": "AUTHOR"},
+    )
+
+    response = await auth_router.handle_auth(request, env, "/auth/test/token")
+
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "UNAUTHORISED"
+
+
+@pytest.mark.asyncio
+async def test_test_token_rejects_invalid_role():
+    env = FakeEnv()
+    request = DummyRequest(
+        method="POST",
+        path="/auth/test/token",
+        headers={"x-e2e-auth-secret": "e2e-secret"},
+        body={"role": "INVALID"},
+    )
+
+    response = await auth_router.handle_auth(request, env, "/auth/test/token")
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_FAILED"
+
+
+@pytest.mark.asyncio
+async def test_test_token_mints_tokens_for_role():
+    env = FakeEnv()
+    request = DummyRequest(
+        method="POST",
+        path="/auth/test/token",
+        headers={"x-e2e-auth-secret": "e2e-secret"},
+        body={"role": "SUPERADMIN"},
+    )
+
+    response = await auth_router.handle_auth(request, env, "/auth/test/token")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert "access_token" in body
+    assert "refresh_token" in body
+    assert body["user"]["role"] == "SUPERADMIN"
+    assert body["user"]["email"] == "e2e.superadmin@zenos.local"

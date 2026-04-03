@@ -149,7 +149,7 @@ class FakeSocialService:
 
     async def share_article(self, user_id, article_id, provider="linkedin"):
         self.calls.append(("share_article", user_id, article_id, provider))
-        if provider != "linkedin":
+        if provider not in {"linkedin", "x", "facebook"}:
             raise ValueError("Unsupported provider")
         return {
             "article_id": article_id,
@@ -402,9 +402,29 @@ class TestSocialEndpoints:
         r = client.post(
             "/api/social/shares/a1",
             headers={"Authorization": f"Bearer {author_token}"},
-            json={"provider": "x"},
+            json={"provider": "mastodon"},
         )
         assert r.status_code == 400
+
+    def test_share_article_x(self, client, author_token):
+        r = client.post(
+            "/api/social/shares/a1",
+            headers={"Authorization": f"Bearer {author_token}"},
+            json={"provider": "x"},
+        )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["share"]["provider"] == "x"
+
+    def test_share_article_facebook(self, client, author_token):
+        r = client.post(
+            "/api/social/shares/a1",
+            headers={"Authorization": f"Bearer {author_token}"},
+            json={"provider": "facebook"},
+        )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["share"]["provider"] == "facebook"
 
     def test_share_stats(self, client, author_token):
         r = client.get(

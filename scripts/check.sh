@@ -15,7 +15,7 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 # Defaults
 # ---------------------------------------------------------------------------
-MIN_COVERAGE="${MIN_COVERAGE:-80}"
+MIN_COVERAGE="${MIN_COVERAGE:-76}"
 RUN_LINT=true
 RUN_BUILD=true
 

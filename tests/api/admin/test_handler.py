@@ -61,6 +61,9 @@ class _Svc:
     async def mark_notifications_read(self, user_id):
         self.calls.append(("mark_notifications_read", user_id))
 
+    async def mark_notification_read(self, user_id, notification_id):
+        self.calls.append(("mark_notification_read", user_id, notification_id))
+
     async def list_content_types(self):
         self.calls.append("list_content_types")
         return {"content_types": [{"slug": "article", "name": "Article"}]}
@@ -81,10 +84,50 @@ class _Svc:
         return {"article_id": article_id, "hours": hours, "points": []}
 
 
+class _Article:
+    def __init__(self, article_id, title, status="SUBMITTED", author_id="author-1"):
+        self.id = article_id
+        self.title = title
+        self.status = status
+        self.author_id = author_id
+
+
+class _ArticleSvc:
+    def __init__(self):
+        self.transitions = []
+        self.notifications = []
+        self.articles = {
+            "a-sub": _Article("a-sub", "Submitted Story", status="SUBMITTED"),
+            "a-app": _Article("a-app", "Approved Story", status="APPROVED"),
+            "a-bad": _Article("a-bad", "Bad State Story", status="ARCHIVED"),
+        }
+
+    async def get_by_id_or_slug(self, article_id):
+        return self.articles.get(article_id)
+
+    async def transition(self, article_id, new_status, actor_id=None, note=None):
+        self.transitions.append((article_id, new_status, actor_id, note))
+        article = self.articles[article_id]
+        article.status = new_status
+        return new_status
+
+    async def notify_user(
+        self, user_id, type_, message, article_id=None, actor_id=None
+    ):
+        self.notifications.append((user_id, type_, message, article_id, actor_id))
+
+
 @pytest.fixture
 def svc(monkeypatch):
     s = _Svc()
     monkeypatch.setattr(admin_handler, "AdminService", lambda env, ctx: s)
+    return s
+
+
+@pytest.fixture
+def article_svc(monkeypatch):
+    s = _ArticleSvc()
+    monkeypatch.setattr(admin_handler, "ArticleService", lambda env, ctx: s)
     return s
 
 
@@ -219,15 +262,25 @@ class TestAdminHandler:
             {},
             _Ctx(),
         )
+        read_one = await admin_handler.handle_admin(
+            _Req("PUT", "/api/admin/notifications/n-42/read"),
+            _Env(),
+            "/api/admin/notifications/n-42/read",
+            "PUT",
+            {},
+            _Ctx(),
+        )
 
         assert ban.status_code == 200
         assert unban.status_code == 200
         assert notif.status_code == 200
         assert read.status_code == 200
+        assert read_one.status_code == 200
         assert ("ban_user", "u2") in svc.calls
         assert ("unban_user", "u2") in svc.calls
         assert ("get_notifications", "u-notify", 4) in svc.calls
         assert ("mark_notifications_read", "u-notify") in svc.calls
+        assert ("mark_notification_read", "u-notify", "n-42") in svc.calls
 
     @pytest.mark.asyncio
     async def test_unknown_route_returns_not_found(self, monkeypatch, svc):
@@ -356,6 +409,78 @@ class TestAdminHandler:
         )
 
         assert resp.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_queue_bulk_reject_requires_note(
+        self, monkeypatch, svc, article_svc, allow_all
+    ):
+        async def _user(_request, _env):
+            return {"sub": "u-approver", "role": "APPROVER"}
+
+        monkeypatch.setattr(admin_handler, "get_user", _user)
+
+        req = _ReqJson(
+            "POST",
+            "/api/admin/queue/bulk",
+            {"action": "reject", "article_ids": ["a-sub"]},
+        )
+        resp = await admin_handler.handle_admin(
+            req,
+            _Env(),
+            "/api/admin/queue/bulk",
+            "POST",
+            {},
+            _Ctx(),
+        )
+
+        assert resp.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_queue_bulk_approve_and_publish(
+        self, monkeypatch, svc, article_svc, allow_all
+    ):
+        async def _user(_request, _env):
+            return {"sub": "u-approver", "role": "APPROVER"}
+
+        monkeypatch.setattr(admin_handler, "get_user", _user)
+
+        approve_req = _ReqJson(
+            "POST",
+            "/api/admin/queue/bulk",
+            {"action": "approve", "article_ids": ["a-sub", "missing"]},
+        )
+        approve_resp = await admin_handler.handle_admin(
+            approve_req,
+            _Env(),
+            "/api/admin/queue/bulk",
+            "POST",
+            {},
+            _Ctx(),
+        )
+
+        assert approve_resp.status_code == 200
+        payload = approve_resp.json()
+        assert payload["succeeded"] == 1
+        assert payload["failed"] == 1
+
+        publish_req = _ReqJson(
+            "POST",
+            "/api/admin/queue/bulk",
+            {"action": "publish", "article_ids": ["a-app", "a-bad"]},
+        )
+        publish_resp = await admin_handler.handle_admin(
+            publish_req,
+            _Env(),
+            "/api/admin/queue/bulk",
+            "POST",
+            {},
+            _Ctx(),
+        )
+
+        assert publish_resp.status_code == 200
+        publish_payload = publish_resp.json()
+        assert publish_payload["succeeded"] == 1
+        assert publish_payload["failed"] == 1
 
     @pytest.mark.asyncio
     async def test_success_signals_get_success(self, monkeypatch, svc, allow_all):

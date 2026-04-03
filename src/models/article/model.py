@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import datetime
+import json
 from typing import Optional
 from models.base import BaseModel, row_get
 from models.common.enums import Scope
@@ -14,6 +15,7 @@ _LIST_FIELDS = {
     "author_id",
     "cover_image_url",
     "read_time_minutes",
+    "reading_level",
     "views_count",
     "likes_count",
     "dislikes_count",
@@ -31,10 +33,13 @@ _LIST_FIELDS = {
     "canonical_url",
     "og_image_url",
     "seo_schema_type",
+    "citations",
     "author_name",
     "author_avatar",
     "tags",
     "is_expired",
+    "premium_only",
+    "premium_teaser_words",
 }
 _DETAIL_FIELDS = _LIST_FIELDS | {"content", "updated_at"}
 _ADMIN_FIELDS = _DETAIL_FIELDS | {"rejection_note", "approved_by"}
@@ -75,11 +80,15 @@ class Article(BaseModel):
     canonical_url: Optional[str] = None
     og_image_url: Optional[str] = None
     seo_schema_type: str = "Article"
+    citations: list[str] = field(default_factory=list)
     # FIX: approved_by was Optional[int] — should be Optional[str] (UUID)
     approved_by: Optional[str] = None
     author_name: Optional[str] = None
     author_avatar: Optional[str] = None
+    reading_level: Optional[str] = None
     tags: list = field(default_factory=list)
+    premium_only: int = 0
+    premium_teaser_words: int = 300
 
     def to_dict(self, scope: str = Scope.LIST) -> dict:
         allowed = {
@@ -107,6 +116,18 @@ class Article(BaseModel):
 
     @classmethod
     def from_row(cls, row) -> "Article":
+        raw_citations = row_get(row, "citations")
+        parsed_citations: list[str] = []
+        if raw_citations:
+            try:
+                loaded = json.loads(str(raw_citations))
+                if isinstance(loaded, list):
+                    parsed_citations = [
+                        str(item) for item in loaded if str(item).strip()
+                    ]
+            except Exception:
+                parsed_citations = []
+
         return cls(
             id=row_get(row, "id"),
             title=row_get(row, "title"),
@@ -137,7 +158,10 @@ class Article(BaseModel):
             canonical_url=row_get(row, "canonical_url"),
             og_image_url=row_get(row, "og_image_url"),
             seo_schema_type=row_get(row, "seo_schema_type", "Article"),
+            citations=parsed_citations,
             approved_by=row_get(row, "approved_by"),
             author_name=row_get(row, "author_name"),
             author_avatar=row_get(row, "author_avatar"),
+            premium_only=row_get(row, "premium_only", 0),
+            premium_teaser_words=row_get(row, "premium_teaser_words", 300),
         )

@@ -2,9 +2,13 @@ import inspect
 from typing import Optional, Any
 
 try:
-    from js import JSON as js_JSON
+    # pyodide.ffi.to_js(None) creates a JsProxy wrapping JS null.
+    # Unlike js_JSON.parse("null") (which auto-converts JS null → Python None),
+    # to_js(None) produces a non-None Python proxy that, when passed as an
+    # argument to a JS function, correctly delivers JS null (not undefined).
+    from pyodide.ffi import to_js as _pyodide_to_js
 
-    js_null = js_JSON.parse("null")
+    js_null = _pyodide_to_js(None)
 except ImportError:  # pragma: no cover - local test environment
     js_null = None
 

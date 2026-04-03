@@ -162,6 +162,7 @@ class TestAdminRepository:
             "done",
         )
         await repo.mark_notifications_read("u1")
+        await repo.mark_notification_read("u1", "n1")
 
         assert executed[0][0] == Q.INSERT_NOTIFICATION
         assert executed[0][1] == (
@@ -175,3 +176,5 @@ class TestAdminRepository:
         )
         assert executed[1][0] == Q.UPDATE_MARK_NOTIFICATIONS_READ
         assert executed[1][1] == ("u1",)
+        assert executed[2][0] == Q.UPDATE_MARK_NOTIFICATION_READ_BY_ID
+        assert executed[2][1] == ("u1", "n1")

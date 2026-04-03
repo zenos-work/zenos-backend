@@ -10,6 +10,7 @@ class SocialService:
     """Business logic for social actions (likes, bookmarks, follows). Zero SQL."""
 
     REACTION_TYPES = ("fire", "lightbulb", "heart", "brain")
+    SHARE_PROVIDERS = ("linkedin", "x", "facebook")
 
     def __init__(self, env, ctx=None):
         self._repo = SocialRepository(env.DB, ctx)
@@ -105,7 +106,7 @@ class SocialService:
         self, user_id: str, article_id: str, provider: str = "linkedin"
     ) -> dict:
         provider_name = str(provider or "linkedin").strip().lower()
-        if provider_name != "linkedin":
+        if provider_name not in self.SHARE_PROVIDERS:
             raise ValueError("Unsupported provider")
 
         await self._repo.share(user_id, article_id, provider_name)

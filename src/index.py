@@ -12,6 +12,8 @@ from api.comments.handler import handle_comments
 from api.social.handler import handle_social
 from api.feed.handler import handle_feed
 from api.media.handler import handle_media
+from api.series.handler import handle_series
+from api.membership.handler import handle_membership
 from api.admin.handler import handle_admin
 from api.search.handler import handle_search
 from api.analytics.service import AnalyticsService
@@ -82,6 +84,10 @@ class Default(WorkerEntrypoint):
             return await handle_feed(request, env, path, method, query, ctx)
         if path.startswith("/api/media"):
             return await handle_media(request, env, path, method, query, ctx)
+        if path.startswith("/api/series"):
+            return await handle_series(request, env, path, method, query, ctx)
+        if path.startswith("/api/membership"):
+            return await handle_membership(request, env, path, method, query, ctx)
         if path.startswith("/api/admin"):
             return await handle_admin(request, env, path, method, query, ctx)
 

@@ -13,6 +13,7 @@ async def handle_users(request, env, path, method, query, ctx):
     parts = path.rstrip("/").split("/")
     user_id = parts[3] if len(parts) > 3 else None
     action = parts[4] if len(parts) > 4 else None
+    target = parts[5] if len(parts) > 5 else None
 
     # GET /api/users/approvers (AUTHOR+ can see approver roster)
     if method == "GET" and user_id == "approvers":
@@ -98,7 +99,7 @@ async def handle_users(request, env, path, method, query, ctx):
         )
 
     # GET /api/users/me
-    if method == "GET" and user_id == "me":
+    if method == "GET" and user_id == "me" and not action:
         user = await get_user(request, env)
         if not user:
             return error("Unauthorised", 401)
@@ -125,6 +126,59 @@ async def handle_users(request, env, path, method, query, ctx):
             return error("Unauthorised", 401)
         prefs = await svc.get_prefs(user["sub"])
         return json_resp({"prefs": prefs})
+
+    # GET /api/users/me/reading-history
+    if method == "GET" and user_id == "me" and action == "reading-history":
+        user = await get_user(request, env)
+        if not user:
+            return error("Unauthorised", 401)
+
+        page = int(query.get("page", ["1"])[0])
+        limit = int(query.get("limit", ["30"])[0])
+        return json_resp(
+            await svc.list_reading_history(user["sub"], page=page, limit=limit)
+        )
+
+    # PUT /api/users/me/reading-history
+    if method == "PUT" and user_id == "me" and action == "reading-history":
+        user = await get_user(request, env)
+        if not user:
+            return error("Unauthorised", 401)
+
+        body = await request.json()
+        data = body if isinstance(body, dict) else {}
+
+        try:
+            item = await svc.upsert_reading_history_item(user["sub"], data)
+            return json_resp({"item": item})
+        except ValueError as e:
+            return error(str(e), 422)
+
+    # DELETE /api/users/me/reading-history/:article_id
+    if (
+        method == "DELETE"
+        and user_id == "me"
+        and action == "reading-history"
+        and target
+    ):
+        user = await get_user(request, env)
+        if not user:
+            return error("Unauthorised", 401)
+
+        try:
+            await svc.remove_reading_history_item(user["sub"], target)
+            return json_resp({"status": "removed"})
+        except ValueError as e:
+            return error(str(e), 422)
+
+    # DELETE /api/users/me/reading-history
+    if method == "DELETE" and user_id == "me" and action == "reading-history":
+        user = await get_user(request, env)
+        if not user:
+            return error("Unauthorised", 401)
+
+        await svc.clear_reading_history(user["sub"])
+        return json_resp({"status": "cleared"})
 
     # PUT /api/users/me
     if method == "PUT" and user_id == "me" and not action:

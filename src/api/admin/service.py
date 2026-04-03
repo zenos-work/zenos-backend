@@ -117,6 +117,12 @@ class AdminService:
     async def mark_notifications_read(self, user_id: str) -> None:
         await self._repo.mark_notifications_read(user_id)
 
+    async def mark_notification_read(self, user_id: str, notification_id: str) -> None:
+        target = str(notification_id or "").strip()
+        if not target:
+            raise ValueError("notification_id is required")
+        await self._repo.mark_notification_read(user_id, target)
+
     async def create_notification(
         self,
         user_id: str,

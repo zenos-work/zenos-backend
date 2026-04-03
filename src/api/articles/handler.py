@@ -7,6 +7,7 @@ from models.article.requests import (
     RejectArticleRequest,
 )
 from api.articles.service import ArticleService
+from api.membership.service import MembershipService
 
 
 async def handle_articles(request, env, path, method, query, ctx):
@@ -27,14 +28,24 @@ async def handle_articles(request, env, path, method, query, ctx):
                 tag=query.get("tag", [None])[0],
                 search=query.get("search", [None])[0],
                 content_type=query.get("content_type", [None])[0],
+                sort=query.get("sort", [None])[0],
             )
         except TypeError:
-            result = await svc.list_published(
-                page=page,
-                limit=limit,
-                tag=query.get("tag", [None])[0],
-                search=query.get("search", [None])[0],
-            )
+            try:
+                result = await svc.list_published(
+                    page=page,
+                    limit=limit,
+                    tag=query.get("tag", [None])[0],
+                    search=query.get("search", [None])[0],
+                    content_type=query.get("content_type", [None])[0],
+                )
+            except TypeError:
+                result = await svc.list_published(
+                    page=page,
+                    limit=limit,
+                    tag=query.get("tag", [None])[0],
+                    search=query.get("search", [None])[0],
+                )
         return json_resp(result.to_dict())
 
     # GET /api/articles/mine
@@ -59,6 +70,56 @@ async def handle_articles(request, env, path, method, query, ctx):
         article = await svc.get_by_id_or_slug(art_id)
         if not article:
             return error("Article not found", 404)
+
+        # Phase 3: Check paywall enforcement (GAP-015)
+        user = await get_user(request, env)
+        membership_svc = MembershipService(env, ctx)
+
+        # Only check paywall if membership service is properly initialized
+        if membership_svc._db and article.premium_only:
+            # Article is premium-only
+            if not user:
+                # Not logged in; return teaser payload
+                return json_resp(
+                    {
+                        "article": article.to_dict(Scope.DETAIL),
+                        "paywall": {
+                            "is_premium": True,
+                            "has_access": False,
+                            "reason": "unauthorized",
+                            "teaser_words": article.premium_teaser_words,
+                            "upgrade_required": True,
+                        },
+                    }
+                )
+
+            # User is logged in; check if they have access
+            has_access = await membership_svc.can_read_premium_article(
+                user["sub"], article.id
+            )
+
+            if not has_access:
+                # User doesn't have access; return paywall
+                return json_resp(
+                    {
+                        "article": article.to_dict(Scope.DETAIL),
+                        "paywall": {
+                            "is_premium": True,
+                            "has_access": False,
+                            "reason": "membership_required",
+                            "teaser_words": article.premium_teaser_words,
+                            "upgrade_required": True,
+                        },
+                    }
+                )
+            else:
+                # User has access; track the premium read
+                await membership_svc.track_premium_read(
+                    user_id=user["sub"],
+                    article_id=article.id,
+                )
+
+        # User has access or article is not premium
         await svc.increment_views(article.id)
         return json_resp({"article": article.to_dict(Scope.DETAIL)})
 
@@ -68,6 +129,25 @@ async def handle_articles(request, env, path, method, query, ctx):
         if not article:
             return error("Article not found", 404)
         return json_resp({"schema": await svc.build_schema(article)})
+
+    # GET /api/articles/:id/series
+    if method == "GET" and art_id and action == "series":
+        from api.series.service import SeriesService
+
+        series_svc = SeriesService(env, ctx)
+        series_info = await series_svc.get_article_series(art_id)
+        if not series_info:
+            return error("Article not in any series", 404)
+        return json_resp({"series": series_info.to_dict()})
+
+    # GET /api/articles/:id/related (Phase 2: Reader Engagement)
+    if method == "GET" and art_id and action == "related":
+        limit = int(query.get("limit", ["5"])[0])
+        limit = min(max(limit, 1), 20)
+        related = await svc.get_related(art_id, limit)
+        return json_resp(
+            {"related": [a.to_dict(Scope.LIST) for a in related], "count": len(related)}
+        )
 
     # POST /api/articles
     if method == "POST" and not art_id:

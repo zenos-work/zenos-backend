@@ -46,3 +46,39 @@ UPDATE_ACCEPT_TERMS = (
 )
 
 SELECT_TERMS_STATUS = "SELECT terms_accepted_at FROM users WHERE id = ?"
+
+SELECT_READING_HISTORY_BY_USER = (
+    "SELECT user_id, article_id, slug, title, subtitle, author_name, cover_image_url,"
+    " read_time_minutes, progress, last_read_at, created_at, updated_at"
+    " FROM user_reading_history"
+    " WHERE user_id = ?"
+    " ORDER BY datetime(last_read_at) DESC"
+    " LIMIT ? OFFSET ?"
+)
+
+COUNT_READING_HISTORY_BY_USER = (
+    "SELECT COUNT(*) AS c FROM user_reading_history WHERE user_id = ?"
+)
+
+UPSERT_READING_HISTORY_ITEM = (
+    "INSERT INTO user_reading_history"
+    " (user_id, article_id, slug, title, subtitle, author_name, cover_image_url,"
+    "  read_time_minutes, progress, last_read_at, created_at, updated_at)"
+    " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(NULLIF(?, ''), datetime('now')), datetime('now'), datetime('now'))"
+    " ON CONFLICT(user_id, article_id) DO UPDATE SET"
+    " slug = excluded.slug,"
+    " title = excluded.title,"
+    " subtitle = excluded.subtitle,"
+    " author_name = excluded.author_name,"
+    " cover_image_url = excluded.cover_image_url,"
+    " read_time_minutes = excluded.read_time_minutes,"
+    " progress = excluded.progress,"
+    " last_read_at = excluded.last_read_at,"
+    " updated_at = datetime('now')"
+)
+
+DELETE_READING_HISTORY_ITEM = (
+    "DELETE FROM user_reading_history WHERE user_id = ? AND article_id = ?"
+)
+
+DELETE_READING_HISTORY_BY_USER = "DELETE FROM user_reading_history WHERE user_id = ?"

@@ -84,6 +84,11 @@ UPDATE_MARK_NOTIFICATIONS_READ = (
     "UPDATE notifications SET is_read = 1" " WHERE user_id = ? AND is_read = 0"
 )
 
+UPDATE_MARK_NOTIFICATION_READ_BY_ID = (
+    "UPDATE notifications SET is_read = 1"
+    " WHERE user_id = ? AND id = ? AND is_read = 0"
+)
+
 SELECT_CONTENT_TYPES_ADMIN = (
     "SELECT id, slug, name, description, is_active, is_system, sort_order, created_by, created_at, updated_at"
     " FROM content_types"
