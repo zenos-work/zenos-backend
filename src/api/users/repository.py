@@ -46,13 +46,13 @@ class UserRepository(BaseRepository):
     async def update_profile(
         self, user_id: str, name: str, avatar_url: Optional[str]
     ) -> None:
-        await self.execute(Q.UPDATE_PROFILE, name, avatar_url, user_id)
+        await self.execute(Q.UPDATE_PROFILE, name, avatar_url or "", user_id)
 
     async def update_avatar_only(self, user_id: str, avatar_url: Optional[str]) -> None:
         """Update only avatar, preserve existing name."""
         await self.execute(
-            'UPDATE users SET avatar_url = ?, updated_at = datetime("now") WHERE id = ?',
-            avatar_url,
+            "UPDATE users SET avatar_url = NULLIF(?, ''), updated_at = datetime(\"now\") WHERE id = ?",
+            avatar_url or "",
             user_id,
         )
 
@@ -74,7 +74,7 @@ class UserRepository(BaseRepository):
     ) -> list[dict]:
         from models.base import row_get
 
-        rows = await self.find_all(
+        rows = await super().find_all(
             Q.SELECT_READING_HISTORY_BY_USER, user_id, limit, offset
         )
         return [
@@ -120,9 +120,9 @@ class UserRepository(BaseRepository):
             article_id,
             slug,
             title,
-            subtitle,
-            author_name,
-            cover_image_url,
+            subtitle or "",
+            author_name or "",
+            cover_image_url or "",
             read_time_minutes,
             progress,
             last_read_at or "",

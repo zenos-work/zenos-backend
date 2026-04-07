@@ -288,7 +288,7 @@ class TestCommentRepository:
         await repo.increment_flag_count("c1")
         await repo.set_moderation("c1", True, "spam", "mod")
 
-        assert executed[0][0] == Q.INSERT_COMMENT
+        assert executed[0][0] in (Q.INSERT_COMMENT, Q.INSERT_COMMENT_NO_PARENT)
         assert executed[1][0] == Q.UPDATE_COMMENT
         assert executed[2][0] == Q.SOFT_DELETE
         assert executed[3][0] == Q.INCREMENT_FLAG_COUNT

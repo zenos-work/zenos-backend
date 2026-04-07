@@ -54,7 +54,7 @@ SELECT_APPROVAL_QUEUE = (
     "SELECT a.*, u.name AS author_name"
     " FROM articles a JOIN users u ON a.author_id = u.id"
     " WHERE a.status IN (?, ?)"
-    " ORDER BY a.updated_at ASC LIMIT ? OFFSET ?"
+    " ORDER BY a.updated_at DESC LIMIT ? OFFSET ?"
 )
 
 COUNT_APPROVAL_QUEUE = "SELECT COUNT(*) AS c FROM articles WHERE status IN (?, ?)"

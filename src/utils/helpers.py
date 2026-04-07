@@ -2,6 +2,7 @@ import json
 import uuid
 import re
 import math
+import inspect
 from urllib.parse import urlsplit
 from js import Headers, Response
 
@@ -36,6 +37,11 @@ def resolve_allowed_origin(env=None, request=None) -> str:
     request_origin = None
     if request and getattr(request, "headers", None):
         request_origin = request.headers.get("Origin")
+        if inspect.isawaitable(request_origin):
+            close = getattr(request_origin, "close", None)
+            if callable(close):
+                close()
+            request_origin = None
 
     if configured == "*" or not request_origin:
         return configured

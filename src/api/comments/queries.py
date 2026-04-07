@@ -39,6 +39,12 @@ INSERT_COMMENT = (
     " VALUES (?, ?, ?, ?, ?)"
 )
 
+INSERT_COMMENT_NO_PARENT = (
+    "INSERT INTO comments"
+    " (id, article_id, author_id, content)"
+    " VALUES (?, ?, ?, ?)"
+)
+
 UPDATE_COMMENT = (
     "UPDATE comments"
     ' SET content = ?, updated_at = datetime("now")'

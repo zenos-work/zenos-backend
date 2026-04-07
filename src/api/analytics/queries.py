@@ -1,7 +1,7 @@
 INSERT_ARTICLE_EVENT = (
     "INSERT INTO article_events"
     " (id, article_id, actor_user_id, event_type, event_value, event_source, metadata_json)"
-    " VALUES (?, ?, ?, ?, ?, ?, ?)"
+    " VALUES (?, ?, NULLIF(?, ''), ?, ?, ?, NULLIF(?, ''))"
 )
 
 UPSERT_HOURLY_SUCCESS = (

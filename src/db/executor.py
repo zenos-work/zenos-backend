@@ -29,7 +29,9 @@ class D1Executor:
         self._ctx = ctx
 
     def _null_value(self):
-        return js_null if js_null is not None else None
+        # D1 reliably binds Python None to SQL NULL in this runtime.
+        # Returning JS proxy null here can surface as unsupported undefined.
+        return None
 
     @staticmethod
     def _is_null_like_string(value: str) -> bool:
