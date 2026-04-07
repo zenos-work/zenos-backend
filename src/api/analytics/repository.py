@@ -18,11 +18,11 @@ class AnalyticsRepository(BaseRepository):
             Q.INSERT_ARTICLE_EVENT,
             event_id,
             article_id,
-            actor_user_id,
+            actor_user_id or "",
             event_type,
             event_value,
             event_source,
-            metadata_json,
+            metadata_json or "",
         )
 
     async def aggregate_hour(

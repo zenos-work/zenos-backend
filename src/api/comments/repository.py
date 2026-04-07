@@ -68,9 +68,14 @@ class CommentRepository(BaseRepository):
         parent_id: Optional[str],
         content: str,
     ) -> None:
-        await self.execute(
-            Q.INSERT_COMMENT, cid, article_id, author_id, parent_id, content
-        )
+        if parent_id is not None:
+            await self.execute(
+                Q.INSERT_COMMENT, cid, article_id, author_id, parent_id, content
+            )
+        else:
+            await self.execute(
+                Q.INSERT_COMMENT_NO_PARENT, cid, article_id, author_id, content
+            )
 
     async def update(self, comment_id: str, content: str) -> None:
         """

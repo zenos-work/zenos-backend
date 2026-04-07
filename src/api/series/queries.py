@@ -95,14 +95,14 @@ LIMIT 1
 
 INSERT_SERIES = """
 INSERT INTO series (id, author_id, name, description, cover_image_url, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?)
+VALUES (?, ?, ?, NULLIF(?, ''), NULLIF(?, ''), ?, ?)
 """
 
 UPDATE_SERIES = """
 UPDATE series
-SET name = COALESCE(?, name),
-    description = COALESCE(?, description),
-    cover_image_url = COALESCE(?, cover_image_url),
+SET name = ?,
+    description = NULLIF(?, ''),
+    cover_image_url = NULLIF(?, ''),
     updated_at = ?
 WHERE id = ? AND author_id = ?
 """

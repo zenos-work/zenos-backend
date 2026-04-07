@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from models.base import BaseModel
 
 
@@ -16,7 +16,7 @@ class SocialActionResult(BaseModel):
             "action": self.action,
             "target_id": self.target_id,
             "active": self.active,
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         }
 
 

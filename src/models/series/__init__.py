@@ -36,6 +36,9 @@ class Series(BaseModel):
         for k, v in self.__dict__.items():
             if k in allowed and v is not None:
                 result[k] = v
+        # Expose `title` as an alias for `name` for forward-compat with TypeScript clients.
+        if "name" in result:
+            result["title"] = result["name"]
         return result
 
     @classmethod

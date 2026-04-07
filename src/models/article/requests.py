@@ -326,7 +326,7 @@ class RejectArticleRequest(BaseRequest):
 
     @classmethod
     def _validate(cls, data: dict) -> "RejectArticleRequest":
-        note = data.get("note")
+        note = data.get("note") or data.get("reason")
         if not note:
             raise ValueError("Rejection note is required")
         note = str(note).strip()

@@ -21,7 +21,7 @@ SELECT_PREFS_BY_USER = "SELECT * FROM user_preferences WHERE user_id = ?"
 INSERT_PREFS = "INSERT OR IGNORE INTO user_preferences (user_id) VALUES (?)"
 
 UPDATE_PROFILE = (
-    "UPDATE users SET name = ?, avatar_url = ?,"
+    "UPDATE users SET name = ?, avatar_url = NULLIF(?, ''),"
     ' updated_at = datetime("now") WHERE id = ?'
 )
 
@@ -64,7 +64,7 @@ UPSERT_READING_HISTORY_ITEM = (
     "INSERT INTO user_reading_history"
     " (user_id, article_id, slug, title, subtitle, author_name, cover_image_url,"
     "  read_time_minutes, progress, last_read_at, created_at, updated_at)"
-    " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(NULLIF(?, ''), datetime('now')), datetime('now'), datetime('now'))"
+    " VALUES (?, ?, ?, ?, NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), ?, ?, COALESCE(NULLIF(?, ''), datetime('now')), datetime('now'), datetime('now'))"
     " ON CONFLICT(user_id, article_id) DO UPDATE SET"
     " slug = excluded.slug,"
     " title = excluded.title,"

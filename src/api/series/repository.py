@@ -95,8 +95,8 @@ class SeriesRepository(BaseRepository):
             series_id,
             author_id,
             name,
-            description,
-            cover_image_url,
+            description or "",
+            cover_image_url or "",
             created_at,
             updated_at,
         )
@@ -113,8 +113,8 @@ class SeriesRepository(BaseRepository):
         await self.execute(
             Q.UPDATE_SERIES,
             name,
-            description,
-            cover_image_url,
+            description or "",
+            cover_image_url or "",
             updated_at,
             series_id,
             author_id,

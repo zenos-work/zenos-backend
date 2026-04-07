@@ -158,7 +158,7 @@ class TestD1Executor:
 
         await ex.run("UPDATE x SET a=?, b=?", UndefinedLike(), "null")
 
-        assert state["bound"][-1] == (sentinel_null, sentinel_null)
+        assert state["bound"][-1] == (None, None)
 
     @pytest.mark.asyncio
     async def test_executor_normalizes_object_undefined_shape(self):

@@ -18,7 +18,7 @@ async def handle_membership(request, env, path, method, query, ctx):
             plans = await svc.get_membership_plans()
             return json_resp({"plans": plans})
         except Exception as e:
-            ctx.logger.error(f"Error fetching plans: {e}")
+            await ctx.log.error(f"Error fetching plans: {e}")
             return error("Failed to fetch plans", 500)
 
     # GET /api/membership/me - Get current user's membership (auth required)
@@ -33,7 +33,7 @@ async def handle_membership(request, env, path, method, query, ctx):
                 return error("User membership not found", 404)
             return json_resp({"membership": membership})
         except Exception as e:
-            ctx.logger.error(f"Error fetching user membership: {e}")
+            await ctx.log.error(f"Error fetching user membership: {e}")
             return error("Failed to fetch membership", 500)
 
     # POST /api/membership/upgrade - Upgrade membership (for testing)
@@ -55,7 +55,7 @@ async def handle_membership(request, env, path, method, query, ctx):
             )
             return json_resp(result, 201)
         except Exception as e:
-            ctx.logger.error(f"Error upgrading membership: {e}")
+            await ctx.log.error(f"Error upgrading membership: {e}")
             return error("Failed to upgrade membership", 500)
 
     # POST /api/membership/premium-read - Track premium article read
@@ -81,7 +81,7 @@ async def handle_membership(request, env, path, method, query, ctx):
             )
             return json_resp(result, 201)
         except Exception as e:
-            ctx.logger.error(f"Error tracking premium read: {e}")
+            await ctx.log.error(f"Error tracking premium read: {e}")
             return error("Failed to track premium read", 500)
 
     # POST /api/membership/funnel-event - Log conversion funnel event
@@ -110,7 +110,7 @@ async def handle_membership(request, env, path, method, query, ctx):
             )
             return json_resp(result, 201)
         except Exception as e:
-            ctx.logger.error(f"Error logging funnel event: {e}")
+            await ctx.log.error(f"Error logging funnel event: {e}")
             return error("Failed to log funnel event", 500)
 
     return error("Not found", 404)

@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List
 from api.series.repository import SeriesRepository
 from api.articles.service import ArticleService
@@ -50,7 +50,7 @@ class SeriesService:
     async def create(self, author_id: str, req: SeriesCreateRequest) -> Series:
         """Create a new series."""
         series_id = str(uuid.uuid4())
-        now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
         await self.repo.create(
             series_id=series_id,
@@ -77,9 +77,15 @@ class SeriesService:
         await self.repo.update(
             series_id=series_id,
             author_id=author_id,
-            name=req.name,
-            description=req.description,
-            cover_image_url=req.cover_image_url,
+            name=req.name if req.name is not None else existing.name,
+            description=(
+                req.description if req.description is not None else existing.description
+            ),
+            cover_image_url=(
+                req.cover_image_url
+                if req.cover_image_url is not None
+                else existing.cover_image_url
+            ),
             updated_at=now,
         )
 
@@ -107,14 +113,14 @@ class SeriesService:
         exists = await self.repo.article_series_exists(article_id, req.series_id)
         if exists:
             # Update part number instead
-            now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+            now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
             await self.repo.update_article_part(
                 article_id, req.series_id, req.part_number, updated_at=now
             )
         else:
             # Create new assignment
             article_series_id = str(uuid.uuid4())
-            now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+            now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
             await self.repo.assign_article(
                 article_series_id=article_series_id,
                 article_id=article_id,
