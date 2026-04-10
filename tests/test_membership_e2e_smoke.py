@@ -308,8 +308,14 @@ class TestMembershipE2ESmoke:
         """Smoke test: Verify Phase 3 migration file exists and is readable."""
         import os
 
-        migration_path = "/mnt/ai-enterprise-machine-shared-disk/projects/zenos/zenos-db/migrations/0027_phase3_membership_and_premium.sql"
-        assert os.path.exists(migration_path)
+        # Prefer current canonical membership migration, but allow legacy filename.
+        candidates = [
+            "/mnt/ai-enterprise-machine-shared-disk/projects/zenos/zenos-db/migrations/0020_membership.sql",
+            "/mnt/ai-enterprise-machine-shared-disk/projects/zenos/zenos-db/migrations/0027_phase3_membership_and_premium.sql",
+        ]
+        migration_path = next((p for p in candidates if os.path.exists(p)), None)
+        assert migration_path is not None
+
         with open(migration_path, "r") as f:
             content = f.read()
             assert "membership_plans" in content

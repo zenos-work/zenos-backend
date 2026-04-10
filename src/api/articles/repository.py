@@ -364,6 +364,17 @@ class ArticleRepository(BaseRepository):
         rows = await self.find_all(Q.SELECT_APPROVER_IDS)
         return [row_get(r, "id") for r in rows if row_get(r, "id")]
 
+    async def user_exists(self, user_id: str) -> bool:
+        row = await self.find_one(Q.SELECT_USER_EXISTS_BY_ID, user_id)
+        return bool(row)
+
+    async def is_coauthor(self, article_id: str, user_id: str) -> bool:
+        row = await self.find_one(Q.SELECT_COAUTHOR_EXISTS, article_id, user_id)
+        return bool(row)
+
+    async def add_coauthor(self, article_id: str, user_id: str, added_by: str) -> None:
+        await self.execute(Q.INSERT_ARTICLE_COAUTHOR, article_id, user_id, added_by)
+
     async def insert_notification(
         self,
         nid: str,

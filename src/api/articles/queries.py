@@ -177,6 +177,17 @@ SELECT_APPROVER_IDS = (
     "SELECT id FROM users WHERE role IN ('APPROVER', 'SUPERADMIN') AND is_active = 1"
 )
 
+SELECT_USER_EXISTS_BY_ID = "SELECT id FROM users WHERE id = ? LIMIT 1"
+
+SELECT_COAUTHOR_EXISTS = (
+    "SELECT 1 FROM article_coauthors WHERE article_id = ? AND user_id = ? LIMIT 1"
+)
+
+INSERT_ARTICLE_COAUTHOR = (
+    "INSERT OR IGNORE INTO article_coauthors (article_id, user_id, added_by)"
+    " VALUES (?, ?, ?)"
+)
+
 INSERT_NOTIFICATION = (
     "INSERT INTO notifications"
     " (id, user_id, actor_id, type, article_id, comment_id, message)"

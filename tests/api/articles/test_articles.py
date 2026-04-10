@@ -122,6 +122,7 @@ class FakeArticleService:
         }
         self._deleted = []
         self._transitions = []
+        self._coauthors = {}
 
     async def list_published(self, page, limit, tag=None, search=None):
         from models.common.pagination import PaginatedResponse
@@ -187,6 +188,39 @@ class FakeArticleService:
 
     async def increment_views(self, article_id):
         pass
+
+    async def duplicate_article(self, article_id, actor_id):
+        source = self._articles.get(article_id)
+        if not source:
+            return None
+        clone_id = f"{article_id}-copy-{len(self._articles)}"
+        clone = _make_article(
+            id=clone_id,
+            status=ArticleStatus.DRAFT,
+            author_id=actor_id,
+            title=f"{source.title} (Copy)",
+        )
+        clone.content = source.content
+        self._articles[clone_id] = clone
+        return clone
+
+    async def add_coauthor(self, article_id, user_id, added_by):
+        article = self._articles.get(article_id)
+        if not article:
+            raise ValueError("Article not found")
+        if user_id == "missing-user":
+            raise ValueError("User not found")
+        if user_id == article.author_id:
+            raise ValueError("Article owner is already the primary author")
+        key = (article_id, user_id)
+        added = key not in self._coauthors
+        if added:
+            self._coauthors[key] = added_by
+        return {
+            "article_id": article_id,
+            "user_id": user_id,
+            "added": added,
+        }
 
 
 class ArticlesClient:
@@ -712,6 +746,148 @@ class TestArticlesEndpoints:
         assert r.status_code == 200
         assert r.json()["deleted"] is True
         assert "art-other" in svc._deleted
+
+    # ── Duplicate / Coauthors ───────────────────────────────────────────────
+
+    def test_duplicate_requires_auth(self, client):
+        r = client.post("/api/articles/art-draft/duplicate")
+        assert r.status_code == 401
+
+    def test_duplicate_owner_succeeds(self, client, author_token):
+        r = client.post(
+            "/api/articles/art-draft/duplicate",
+            headers={"Authorization": f"Bearer {author_token}"},
+        )
+        assert r.status_code == 201
+        assert r.json()["article"]["title"].endswith("(Copy)")
+        assert r.json()["article"]["author_id"] == "auth-user"
+
+    def test_duplicate_non_owner_forbidden(self, client, author_token):
+        r = client.post(
+            "/api/articles/art-other/duplicate",
+            headers={"Authorization": f"Bearer {author_token}"},
+        )
+        assert r.status_code == 403
+
+    def test_add_coauthor_requires_auth(self, non_strict_client):
+        r = non_strict_client.post(
+            "/api/articles/art-draft/coauthors",
+            json={"user_id": "coauthor-1"},
+        )
+        assert r.status_code == 401
+
+    def test_add_coauthor_conflicts_in_single_author_mode(self, client, author_token):
+        r = client.post(
+            "/api/articles/art-draft/coauthors",
+            headers={"Authorization": f"Bearer {author_token}"},
+            json={"user_id": "coauthor-1"},
+        )
+        assert r.status_code == 409
+
+    def test_add_coauthor_requires_feature_flag(
+        self, non_strict_client, author_token, monkeypatch
+    ):
+        async def _flag_disabled(*_args, **_kwargs):
+            return False
+
+        monkeypatch.setattr(
+            articles_handler.FeatureFlagService,
+            "evaluate_one",
+            _flag_disabled,
+        )
+
+        r = non_strict_client.post(
+            "/api/articles/art-draft/coauthors",
+            headers={"Authorization": f"Bearer {author_token}"},
+            json={"user_id": "coauthor-1"},
+        )
+        assert r.status_code == 403
+
+    def test_add_coauthor_success_and_idempotent(
+        self, non_strict_client, author_token, svc, monkeypatch
+    ):
+        async def _flag_enabled(*_args, **_kwargs):
+            return True
+
+        monkeypatch.setattr(
+            articles_handler.FeatureFlagService,
+            "evaluate_one",
+            _flag_enabled,
+        )
+
+        created = non_strict_client.post(
+            "/api/articles/art-draft/coauthors",
+            headers={"Authorization": f"Bearer {author_token}"},
+            json={"user_id": "coauthor-1"},
+        )
+        assert created.status_code == 201
+        assert created.json()["added"] is True
+        assert ("art-draft", "coauthor-1") in svc._coauthors
+
+        existing = non_strict_client.post(
+            "/api/articles/art-draft/coauthors",
+            headers={"Authorization": f"Bearer {author_token}"},
+            json={"user_id": "coauthor-1"},
+        )
+        assert existing.status_code == 200
+        assert existing.json()["added"] is False
+
+    def test_add_coauthor_missing_user_id(
+        self, non_strict_client, author_token, monkeypatch
+    ):
+        async def _flag_enabled(*_args, **_kwargs):
+            return True
+
+        monkeypatch.setattr(
+            articles_handler.FeatureFlagService,
+            "evaluate_one",
+            _flag_enabled,
+        )
+
+        r = non_strict_client.post(
+            "/api/articles/art-draft/coauthors",
+            headers={"Authorization": f"Bearer {author_token}"},
+            json={},
+        )
+        assert r.status_code == 422
+
+    def test_add_coauthor_user_not_found(
+        self, non_strict_client, author_token, monkeypatch
+    ):
+        async def _flag_enabled(*_args, **_kwargs):
+            return True
+
+        monkeypatch.setattr(
+            articles_handler.FeatureFlagService,
+            "evaluate_one",
+            _flag_enabled,
+        )
+
+        r = non_strict_client.post(
+            "/api/articles/art-draft/coauthors",
+            headers={"Authorization": f"Bearer {author_token}"},
+            json={"user_id": "missing-user"},
+        )
+        assert r.status_code == 404
+
+    def test_add_coauthor_non_owner_forbidden(
+        self, non_strict_client, author_token, monkeypatch
+    ):
+        async def _flag_enabled(*_args, **_kwargs):
+            return True
+
+        monkeypatch.setattr(
+            articles_handler.FeatureFlagService,
+            "evaluate_one",
+            _flag_enabled,
+        )
+
+        r = non_strict_client.post(
+            "/api/articles/art-other/coauthors",
+            headers={"Authorization": f"Bearer {author_token}"},
+            json={"user_id": "coauthor-2"},
+        )
+        assert r.status_code == 403
 
     # ── Workflow: Submit ──────────────────────────────────────────────────────
 

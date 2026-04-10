@@ -269,6 +269,63 @@ async def handle_articles(request, env, path, method, query, ctx):
             new_status = await svc.transition(art_id, ArticleStatus.SUBMITTED)
             return json_resp({"status": new_status, "moderation": moderation})
 
+        # POST /api/articles/:id/duplicate
+        if action == "duplicate":
+            collaboration_enabled = False
+            if not single_author_mode:
+                flag_svc = FeatureFlagService(env, ctx)
+                collaboration_enabled = await flag_svc.evaluate_one(
+                    COLLABORATION_FLAG_KEY,
+                    user_id=user["sub"],
+                    user_role=user.get("role", ""),
+                    org_id=getattr(article, "org_id", None),
+                )
+            owner_override_allowed = (
+                require_role(user, ["SUPERADMIN"]) and collaboration_enabled
+            )
+            if article.author_id != user["sub"] and not owner_override_allowed:
+                return error("Forbidden", 403)
+
+            duplicated = await svc.duplicate_article(art_id, user["sub"])
+            if not duplicated:
+                return error("Article not found", 404)
+            return json_resp({"article": duplicated.to_dict(Scope.DETAIL)}, 201)
+
+        # POST /api/articles/:id/coauthors
+        if action == "coauthors":
+            if single_author_mode:
+                return error("Coauthoring is disabled in single-author mode", 409)
+
+            flag_svc = FeatureFlagService(env, ctx)
+            collaboration_enabled = await flag_svc.evaluate_one(
+                COLLABORATION_FLAG_KEY,
+                user_id=user["sub"],
+                user_role=user.get("role", ""),
+                org_id=getattr(article, "org_id", None),
+            )
+            if not collaboration_enabled:
+                return error("Coauthor feature is disabled", 403)
+
+            owner_override_allowed = require_role(user, ["SUPERADMIN"])
+            if article.author_id != user["sub"] and not owner_override_allowed:
+                return error("Forbidden", 403)
+
+            payload = await request.json()
+            coauthor_user_id = str(payload.get("user_id", "")).strip()
+            if not coauthor_user_id:
+                return error("user_id is required", 422)
+
+            try:
+                result = await svc.add_coauthor(art_id, coauthor_user_id, user["sub"])
+            except ValueError as e:
+                message = str(e)
+                if message in {"Article not found", "User not found"}:
+                    return error(message, 404)
+                return error(message, 409)
+
+            status_code = 201 if result.get("added") else 200
+            return json_resp(result, status_code)
+
         # POST /api/articles/:id/approve
         if action == "approve":
             if not require_role(user, UserRole.CAN_APPROVE):

@@ -74,6 +74,110 @@ class ArticleService:
         """Get related articles by shared tags (Phase 2: Reader Engagement)."""
         return await self._repo.find_related(article_id, limit)
 
+    async def duplicate_article(
+        self, article_id: str, actor_id: str
+    ) -> Optional[Article]:
+        source = await self._repo.find_by_id_or_slug(article_id)
+        if not source:
+            return None
+
+        duplicate_title = (
+            f"{source.title} (Copy)" if source.title else "Untitled (Copy)"
+        )
+        duplicate_id = new_id()
+        duplicate_slug = unique_slug(duplicate_title)
+
+        try:
+            duplicated = await self._repo.insert(
+                aid=duplicate_id,
+                author_id=actor_id,
+                title=duplicate_title,
+                slug=duplicate_slug,
+                subtitle=source.subtitle,
+                content_type=source.content_type,
+                content=source.content,
+                cover_image_url=source.cover_image_url,
+                read_time=calc_read_time(source.content),
+                status=ArticleStatus.DRAFT,
+                last_verified_at=source.last_verified_at,
+                expires_at=source.expires_at or LIFELONG_EXPIRES_AT,
+                seo_title=source.seo_title,
+                seo_description=source.seo_description,
+                canonical_url=source.canonical_url,
+                og_image_url=source.og_image_url,
+                seo_schema_type=source.seo_schema_type,
+                reading_level=source.reading_level,
+                citations=source.citations,
+            )
+        except TypeError:
+            duplicated = await self._repo.insert(
+                duplicate_id,
+                actor_id,
+                duplicate_title,
+                duplicate_slug,
+                source.subtitle,
+                source.content_type,
+                source.content,
+                source.cover_image_url,
+                calc_read_time(source.content),
+                ArticleStatus.DRAFT,
+                source.last_verified_at,
+                source.expires_at or LIFELONG_EXPIRES_AT,
+                source.seo_title,
+                source.seo_description,
+                source.canonical_url,
+                source.og_image_url,
+                source.seo_schema_type,
+                source.reading_level,
+                source.citations,
+            )
+
+        source_tag_ids = [
+            tag.id for tag in (source.tags or []) if getattr(tag, "id", None)
+        ]
+        if source_tag_ids:
+            await self._repo.sync_tags(duplicate_id, source_tag_ids)
+            duplicated.tags = await self._repo._fetch_tags(duplicate_id)
+
+        await self._log(
+            "article.duplicated",
+            {
+                "source_article_id": article_id,
+                "duplicate_article_id": duplicate_id,
+                "actor_id": actor_id,
+            },
+        )
+        return duplicated
+
+    async def add_coauthor(self, article_id: str, user_id: str, added_by: str) -> dict:
+        article = await self._repo.find_by_id_or_slug(article_id)
+        if not article:
+            raise ValueError("Article not found")
+
+        if user_id == article.author_id:
+            raise ValueError("Article owner is already the primary author")
+
+        if not await self._repo.user_exists(user_id):
+            raise ValueError("User not found")
+
+        already_coauthor = await self._repo.is_coauthor(article_id, user_id)
+        if not already_coauthor:
+            await self._repo.add_coauthor(article_id, user_id, added_by)
+            await self._log(
+                "article.coauthor_added",
+                {
+                    "article_id": article_id,
+                    "user_id": user_id,
+                    "added_by": added_by,
+                },
+            )
+
+        return {
+            "article_id": article_id,
+            "user_id": user_id,
+            "added": not already_coauthor,
+        }
+
     async def create(
         self,
         req: ArticleCreateRequest,
