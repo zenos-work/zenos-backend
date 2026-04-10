@@ -4,7 +4,7 @@ Tests for Phase 13 - Step 52: Workflow Promotion CI/CD
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock
-from datetime import datetime
+from datetime import datetime, timezone
 import sys
 import os
 
@@ -136,10 +136,10 @@ class TestPromotionService:
                 "to_env": "staging",
                 "status": "promoted",
                 "requested_by": "user-123",
-                "requested_at": datetime.utcnow().isoformat(),
+                "requested_at": datetime.now(timezone.utc).isoformat(),
                 "approved_by": "approver-1",
-                "approved_at": datetime.utcnow().isoformat(),
-                "promoted_at": datetime.utcnow().isoformat(),
+                "approved_at": datetime.now(timezone.utc).isoformat(),
+                "promoted_at": datetime.now(timezone.utc).isoformat(),
                 "notes": None,
                 "test_results": None,
             }
@@ -170,7 +170,7 @@ class TestPromotionService:
                             return_value={
                                 "id": "w-1",
                                 "environment": "staging",
-                                "updated_at": datetime.utcnow().isoformat(),
+                                "updated_at": datetime.now(timezone.utc).isoformat(),
                             }
                         )
                     )
@@ -181,7 +181,7 @@ class TestPromotionService:
                         first=AsyncMock(
                             return_value={
                                 "run_count": 5,
-                                "last_run": datetime.utcnow().isoformat(),
+                                "last_run": datetime.now(timezone.utc).isoformat(),
                             }
                         )
                     )
@@ -208,7 +208,7 @@ class TestPromotionRequest:
             to_env="staging",
             status="pending",
             requested_by="user-123",
-            requested_at=datetime.utcnow().isoformat(),
+            requested_at=datetime.now(timezone.utc).isoformat(),
             approved_by=None,
             approved_at=None,
             promoted_at=None,
@@ -222,7 +222,7 @@ class TestPromotionRequest:
 
     def test_promotion_request_to_dict(self):
         """Convert promotion request to dict"""
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         request = PromotionRequest(
             id="promo-1",
             workflow_id="w-1",

@@ -307,3 +307,54 @@ class AdminRepository(BaseRepository):
             }
             for r in rows
         ]
+
+    # ── Notification delivery dispatch ────────────────────────────────────────
+
+    async def find_pending_delivery_by_channel(
+        self, channel: str, limit: int = 100
+    ) -> list[dict]:
+        """Return pending notifications for a given delivery channel with user info."""
+        rows = await self.find_all(Q.SELECT_PENDING_DELIVERY_BY_CHANNEL, channel, limit)
+        return [
+            {
+                "id": row_get(r, "id"),
+                "user_id": row_get(r, "user_id"),
+                "message": row_get(r, "message"),
+                "type": row_get(r, "type"),
+                "group_key": row_get(r, "group_key"),
+                "channel": row_get(r, "channel"),
+                "user_email": row_get(r, "user_email"),
+                "user_name": row_get(r, "user_name"),
+            }
+            for r in rows
+        ]
+
+    async def find_push_subs_for_users(self, user_ids: list[str]) -> list[dict]:
+        """Return active push subscriptions for a set of user IDs."""
+        if not user_ids:
+            return []
+        placeholders = ",".join("?" * len(user_ids))
+        sql = Q.SELECT_PUSH_SUBS_FOR_USERS.format(placeholders=placeholders)
+        rows = await self.find_all(sql, *user_ids)
+        return [
+            {
+                "user_id": row_get(r, "user_id"),
+                "endpoint": row_get(r, "endpoint"),
+                "p256dh_key": row_get(r, "p256dh_key"),
+                "auth_key": row_get(r, "auth_key"),
+                "platform": row_get(r, "platform"),
+            }
+            for r in rows
+        ]
+
+    async def update_notification_delivery_status(
+        self, notif_id: str, status: str, external_ref: str = ""
+    ) -> None:
+        """Update delivery_status (and optionally external_ref) for one notification."""
+        await self.execute(
+            Q.UPDATE_NOTIFICATION_DELIVERY_STATUS,
+            status,
+            status,
+            external_ref or "",
+            notif_id,
+        )

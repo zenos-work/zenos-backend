@@ -86,7 +86,7 @@ _JWT_SECRET = "test-secret"
 # ═══════════════════════════════════════════════════════════════
 # Model Tests
 # ═══════════════════════════════════════════════════════════════
-class TestPhase11Models:
+class TestEnterpriseInfraModels:
     def test_subdomain_config_from_row_and_to_dict(self):
         row = {
             "org_id": "org1",

@@ -68,6 +68,15 @@ async def handle_feature_flags(request, env, path, method, query, ctx):
         except ValueError as e:
             return error(str(e), 404)
 
+    # POST /api/admin/feature-flags/preview-announcement — preview message and audience
+    if method == "POST" and len(parts) == 5 and parts[4] == "preview-announcement":
+        body = await request.json()
+        data = body if isinstance(body, dict) else {}
+        try:
+            return json_resp(await svc.preview_announcement(data))
+        except ValueError as e:
+            return error(str(e), 400)
+
     # POST /api/admin/feature-flags — create
     if method == "POST" and len(parts) <= 4:
         body = await request.json()

@@ -4,7 +4,7 @@ Tests for Phase 13 - Step 49: GenAI Node Definitions and Execution
 
 import pytest
 import json
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 import sys
 import os
 
@@ -262,11 +262,12 @@ class TestGenAIExecutor:
         ctx = AsyncMock()
         db = AsyncMock()
 
-        # Mock prepare chain
-        mock_bind = AsyncMock()
+        # Mock prepare chain with sync prepare/bind and async run.
+        mock_bind = MagicMock()
         mock_bind.run = AsyncMock()
-        mock_prepare = AsyncMock(return_value=AsyncMock(bind=mock_bind))
-        db.prepare = mock_prepare
+        mock_prepare_obj = MagicMock()
+        mock_prepare_obj.bind = MagicMock(return_value=mock_bind)
+        db.prepare = MagicMock(return_value=mock_prepare_obj)
 
         executor = GenAIExecutor(ctx, db)
 
@@ -293,7 +294,7 @@ class TestGenAIExecutor:
 
         assert result.success is True
         # Verify prepare was called (usage was logged)
-        assert mock_prepare.called
+        assert db.prepare.called
 
     @pytest.mark.asyncio
     async def test_execution_time_tracking(self):

@@ -2,6 +2,7 @@ from typing import Optional
 from api.articles.repository import ArticleRepository
 from api.articles.moderation import ArticleModerationEngine
 from api.analytics.service import AnalyticsService
+from api.moderation.ai_detection import AIDetectionService
 from models.article.model import Article
 from models.article.requests import ArticleCreateRequest, ArticleUpdateRequest
 from models.common.pagination import PaginatedResponse
@@ -18,8 +19,13 @@ class ArticleService:
     """
 
     def __init__(self, env, ctx=None):
+        self._env = env
         self._repo = ArticleRepository(env.DB, ctx)
         self._moderation = ArticleModerationEngine()
+        self._ai_detection = AIDetectionService(
+            env.DB,
+            external_api_key=getattr(env, "AI_DETECTION_API_KEY", None),
+        )
         self._analytics_service = AnalyticsService(env, ctx)
         self._ctx = ctx
 
@@ -294,32 +300,87 @@ class ArticleService:
         return new_status
 
     async def run_auto_moderation(self, article: Article) -> dict:
+        ai_note = ""
+        enable_ai_moderation = str(
+            getattr(self._env, "ENABLE_AI_MODERATION", "true")
+        ).lower() in {"1", "true", "yes", "on"}
+
+        if enable_ai_moderation:
+            try:
+                ai_result = await self._ai_detection.scan_article(
+                    article_id=article.id,
+                    content=f"{article.title}\n\n{article.content or ''}",
+                    use_external_api=False,
+                    provider="heuristic",
+                )
+                await self._ai_detection.log_detection(article.id, ai_result)
+
+                if ai_result.decision == "auto_rejected":
+                    note = (
+                        "AI-assisted moderation rejected this submission "
+                        f"(confidence={round(ai_result.ai_probability * 100, 1)}%)."
+                    )
+                    await self._repo.set_status(
+                        article.id,
+                        ArticleStatus.REJECTED,
+                        rejection_note=note,
+                        moderation_state="AUTO_REJECTED_AI",
+                        moderation_note=note,
+                    )
+                    await self.notify_user(
+                        user_id=article.author_id,
+                        type_=NotificationType.MODERATION_REJECTED,
+                        message=note,
+                        article_id=article.id,
+                    )
+                    return {
+                        "decision": "rejected",
+                        "state": "AUTO_REJECTED_AI",
+                        "note": note,
+                    }
+
+                if ai_result.decision == "flagged_for_review":
+                    ai_note = (
+                        "AI-assisted moderation flagged this submission for manual review "
+                        f"(confidence={round(ai_result.ai_probability * 100, 1)}%)."
+                    )
+            except Exception:
+                # Keep submission flow resilient if AI detection fails.
+                pass
+
         result = self._moderation.check(article.title, article.content)
         if result.decision == "rejected":
+            rejection_note = result.note
+            if ai_note:
+                rejection_note = f"{rejection_note} {ai_note}".strip()
             await self._repo.set_status(
                 article.id,
                 ArticleStatus.REJECTED,
-                rejection_note=result.note,
+                rejection_note=rejection_note,
                 moderation_state=result.state,
-                moderation_note=result.note,
+                moderation_note=rejection_note,
             )
             await self.notify_user(
                 user_id=article.author_id,
                 type_=NotificationType.MODERATION_REJECTED,
-                message=result.note or "Auto-moderation rejected the submission.",
+                message=rejection_note or "Auto-moderation rejected the submission.",
                 article_id=article.id,
             )
             return {
                 "decision": result.decision,
                 "state": result.state,
-                "note": result.note,
+                "note": rejection_note,
             }
 
-        await self._repo.update_moderation_state(article.id, result.state, result.note)
+        pending_note = result.note or "Submission is pending admin approval."
+        if ai_note:
+            pending_note = f"{pending_note} {ai_note}".strip()
+
+        await self._repo.update_moderation_state(article.id, result.state, pending_note)
         await self.notify_user(
             user_id=article.author_id,
             type_=NotificationType.MODERATION_PENDING,
-            message=result.note or "Submission is pending admin approval.",
+            message=pending_note,
             article_id=article.id,
         )
 

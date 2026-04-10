@@ -14,6 +14,34 @@ async def handle_admin(request, env, path, method, query, ctx):
     target = parts[4] if len(parts) > 4 else None
     action = parts[5] if len(parts) > 5 else None
 
+    # ── Internal service endpoints (skip user JWT, require ZENOS_SERVICE_SECRET) ──
+
+    # GET /api/admin/notifications/pending-delivery?channel=email|push&limit=100
+    if method == "GET" and section == "notifications" and target == "pending-delivery":
+        service_secret = str(getattr(env, "ZENOS_SERVICE_SECRET", "") or "").strip()
+        auth_header = (request.headers.get("authorization") or "").strip()
+        if not service_secret or auth_header != f"Bearer {service_secret}":
+            return error("Forbidden", 403)
+        channel = str(query.get("channel", ["email"])[0] or "email").strip()
+        limit = max(1, min(int(query.get("limit", ["100"])[0] or 100), 500))
+        return json_resp(await svc.get_pending_delivery(channel, limit))
+
+    # POST /api/admin/notifications/delivery-status  — bulk update from delivery worker
+    if method == "POST" and section == "notifications" and target == "delivery-status":
+        service_secret = str(getattr(env, "ZENOS_SERVICE_SECRET", "") or "").strip()
+        auth_header = (request.headers.get("authorization") or "").strip()
+        if not service_secret or auth_header != f"Bearer {service_secret}":
+            return error("Forbidden", 403)
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = {}
+        updates = payload.get("updates", []) if isinstance(payload, dict) else []
+        result = await svc.bulk_update_delivery_status(updates)
+        return json_resp(result)
+
+    # ── All remaining routes require user JWT ──────────────────────────────────
+
     user = await get_user(request, env)
     if not user:
         return error("Unauthorised", 401)

@@ -48,6 +48,7 @@ from api.sso.handler import handle_sso
 from api.vault.handler import handle_vault
 from api.billing.handler import handle_billing
 from api.compliance.handler import handle_compliance
+from api.public_content.handler import handle_public_content
 
 from js import Response
 
@@ -100,6 +101,10 @@ class Default(WorkerEntrypoint):
 
         if path.startswith("/auth/"):
             return await handle_auth(request, env, path)
+
+        # SR-023: Public content API (read-only, external-facing)
+        if path.startswith("/api/public/v1"):
+            return await handle_public_content(request, env, path, method, query, ctx)
 
         if path.startswith("/api/articles") and "/revisions" in path:
             return await handle_revisions(request, env, path, method, query, ctx)

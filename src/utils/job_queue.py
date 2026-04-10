@@ -5,7 +5,7 @@ At-least-once delivery via D1 polling without Cloudflare Queues (free tier compa
 
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import json
 import uuid
 
@@ -111,7 +111,7 @@ class JobQueue:
             raise ValueError(f"Unknown job type: {job_type}")
 
         job_id = str(uuid.uuid4())
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
 
         query = """
             INSERT INTO job_queue (
@@ -162,7 +162,7 @@ class JobQueue:
         Returns:
             List of claimed jobs (locked for processing)
         """
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
 
         # Find pending jobs (sorted by priority, then created_at)
         fetch_query = """
@@ -229,7 +229,7 @@ class JobQueue:
 
     async def mark_completed(self, job_id: str) -> None:
         """Mark a job as successfully completed"""
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
 
         query = """
             UPDATE job_queue
@@ -248,7 +248,7 @@ class JobQueue:
 
         After max_attempts, moves to 'dead' status.
         """
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
 
         # Get current job state
         query = "SELECT attempt_count, max_attempts FROM job_queue WHERE id = ?"
@@ -276,7 +276,7 @@ class JobQueue:
             # Schedule retry with exponential backoff
             backoff_seconds = min(60 * (2**next_attempt), self.MAX_BACKOFF_SECONDS)
             next_retry_at = (
-                datetime.utcnow() + timedelta(seconds=backoff_seconds)
+                datetime.now(timezone.utc) + timedelta(seconds=backoff_seconds)
             ).isoformat()
 
             update_query = """

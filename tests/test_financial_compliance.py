@@ -235,7 +235,7 @@ def client(svc):
     return _make_client(svc)
 
 
-class TestPhase12Step46Endpoints:
+class TestEarningsEndpoints:
     def _h(self, role="AUTHOR"):
         return {"Authorization": f"Bearer {_token(role=role)}"}
 
@@ -354,7 +354,7 @@ def _make_billing_client():
     return Client()
 
 
-class TestPhase12Step47Billing:
+class TestBillingEndpoints:
     def _h(self, role="SUPERADMIN"):
         return {"Authorization": f"Bearer {_token(role=role)}"}
 
@@ -523,7 +523,7 @@ def _make_compliance_client():
     return Client()
 
 
-class TestPhase12Step48Compliance:
+class TestComplianceEndpoints:
     def _h(self, role="AUTHOR"):
         return {"Authorization": f"Bearer {_token(role=role)}"}
 

@@ -5,7 +5,7 @@ Handles execution of GenAI nodes with provider abstraction and cost tracking.
 
 import json
 from typing import Any, Dict, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from dataclasses import dataclass
 
 from .genai_nodes import (
@@ -405,7 +405,7 @@ class GenAIExecutor:
                     cost_microcents,
                     provider,
                     model,
-                    datetime.utcnow().isoformat(),
+                    datetime.now(timezone.utc).isoformat(),
                 )
                 .run()
             )

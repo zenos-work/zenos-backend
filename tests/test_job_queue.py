@@ -4,7 +4,7 @@ Tests for Phase 13 - Step 50: Durable Job Queue
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock
-from datetime import datetime
+from datetime import datetime, timezone
 import sys
 import os
 
@@ -77,7 +77,7 @@ class TestJobQueue:
     @pytest.mark.asyncio
     async def test_claim_job_pending(self, queue, mock_db):
         """Claim pending jobs with optimistic locking"""
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         job_data = {
             "id": "job-1",
             "job_type": "workflow_run",
@@ -197,8 +197,8 @@ class TestJobQueue:
             "locked_at": None,
             "completed_at": None,
             "error_message": None,
-            "created_at": datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
         }
 
         mock_first = AsyncMock(return_value=job_data)
@@ -243,8 +243,8 @@ class TestJobQueue:
                 "locked_at": None,
                 "completed_at": None,
                 "error_message": None,
-                "created_at": datetime.utcnow().isoformat(),
-                "updated_at": datetime.utcnow().isoformat(),
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
             }
             for i in range(3)
         ]
@@ -277,8 +277,8 @@ class TestJobQueue:
                 "locked_at": None,
                 "completed_at": None,
                 "error_message": "Max retries exceeded",
-                "created_at": datetime.utcnow().isoformat(),
-                "updated_at": datetime.utcnow().isoformat(),
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
             }
             for i in range(2)
         ]
@@ -313,8 +313,8 @@ class TestJobRecord:
             locked_at=None,
             completed_at=None,
             error_message=None,
-            created_at=datetime.utcnow().isoformat(),
-            updated_at=datetime.utcnow().isoformat(),
+            created_at=datetime.now(timezone.utc).isoformat(),
+            updated_at=datetime.now(timezone.utc).isoformat(),
         )
 
         assert record.id == "job-1"
@@ -323,7 +323,7 @@ class TestJobRecord:
 
     def test_job_record_to_dict(self):
         """Convert JobRecord to dictionary"""
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         payload = {"workflow_id": "w-1", "input": "test"}
 
         record = JobRecord(

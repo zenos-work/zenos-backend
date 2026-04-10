@@ -76,6 +76,7 @@ class FakeRequest:
 
 class FakeEnv:
     JWT_SECRET = _JWT_SECRET
+    DB = object()
 
 
 class FakeCtx:
@@ -212,9 +213,6 @@ class ArticlesClient:
         )
         svc = self.svc
 
-        class _Env:
-            JWT_SECRET = "test-secret"
-
         def _make_svc(_env, _ctx=None):
             return svc
 
@@ -226,7 +224,7 @@ class ArticlesClient:
             result = asyncio.run(
                 articles_handler.handle_articles(
                     request,
-                    _Env(),
+                    self.env,
                     parsed.path,
                     method,
                     parse_qs(parsed.query),
@@ -522,6 +520,19 @@ def reader_token():
     return _token(role="READER", sub="reader-user")
 
 
+@pytest.fixture
+def superadmin_token():
+    return _token(role="SUPERADMIN", sub="superadmin-user")
+
+
+@pytest.fixture
+def non_strict_client(svc):
+    class _Env(FakeEnv):
+        SINGLE_AUTHOR_MODE = "false"
+
+    return ArticlesClient(_Env(), svc)
+
+
 class TestArticlesEndpoints:
     # ── List/Get ──────────────────────────────────────────────────────────────
 
@@ -607,6 +618,45 @@ class TestArticlesEndpoints:
         assert r.status_code == 200
         assert svc._articles["art-draft"].title == "Updated Title Here"
 
+    def test_update_superadmin_forbidden_when_collaboration_flag_disabled(
+        self, non_strict_client, superadmin_token, monkeypatch
+    ):
+        async def _flag_disabled(*_args, **_kwargs):
+            return False
+
+        monkeypatch.setattr(
+            articles_handler.FeatureFlagService,
+            "evaluate_one",
+            _flag_disabled,
+        )
+
+        r = non_strict_client.put(
+            "/api/articles/art-other",
+            headers={"Authorization": f"Bearer {superadmin_token}"},
+            json={"title": "Superadmin Attempt"},
+        )
+        assert r.status_code == 403
+
+    def test_update_superadmin_allowed_when_collaboration_flag_enabled(
+        self, non_strict_client, superadmin_token, svc, monkeypatch
+    ):
+        async def _flag_enabled(*_args, **_kwargs):
+            return True
+
+        monkeypatch.setattr(
+            articles_handler.FeatureFlagService,
+            "evaluate_one",
+            _flag_enabled,
+        )
+
+        r = non_strict_client.put(
+            "/api/articles/art-other",
+            headers={"Authorization": f"Bearer {superadmin_token}"},
+            json={"title": "Superadmin Updated"},
+        )
+        assert r.status_code == 200
+        assert svc._articles["art-other"].title == "Superadmin Updated"
+
     # ── Delete ────────────────────────────────────────────────────────────────
 
     def test_delete_not_owner_forbidden(self, client, author_token):
@@ -624,6 +674,44 @@ class TestArticlesEndpoints:
         assert r.status_code == 200
         assert r.json()["deleted"] is True
         assert "art-draft" in svc._deleted
+
+    def test_delete_superadmin_forbidden_when_collaboration_flag_disabled(
+        self, non_strict_client, superadmin_token, monkeypatch
+    ):
+        async def _flag_disabled(*_args, **_kwargs):
+            return False
+
+        monkeypatch.setattr(
+            articles_handler.FeatureFlagService,
+            "evaluate_one",
+            _flag_disabled,
+        )
+
+        r = non_strict_client.delete(
+            "/api/articles/art-other",
+            headers={"Authorization": f"Bearer {superadmin_token}"},
+        )
+        assert r.status_code == 403
+
+    def test_delete_superadmin_allowed_when_collaboration_flag_enabled(
+        self, non_strict_client, superadmin_token, svc, monkeypatch
+    ):
+        async def _flag_enabled(*_args, **_kwargs):
+            return True
+
+        monkeypatch.setattr(
+            articles_handler.FeatureFlagService,
+            "evaluate_one",
+            _flag_enabled,
+        )
+
+        r = non_strict_client.delete(
+            "/api/articles/art-other",
+            headers={"Authorization": f"Bearer {superadmin_token}"},
+        )
+        assert r.status_code == 200
+        assert r.json()["deleted"] is True
+        assert "art-other" in svc._deleted
 
     # ── Workflow: Submit ──────────────────────────────────────────────────────
 

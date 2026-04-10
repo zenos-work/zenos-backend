@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 from api.membership.service import MembershipService
 from models.user.model import User
 from models.article.model import Article
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 
 @pytest.fixture
@@ -31,7 +31,7 @@ def test_ctx():
     return ctx
 
 
-class TestPhase3E2ESmokeTests:
+class TestMembershipE2ESmoke:
     """Smoke tests verifying Phase 3 core functionality end-to-end."""
 
     @pytest.mark.asyncio
@@ -258,7 +258,7 @@ class TestPhase3E2ESmokeTests:
             membership_tier="creator_pro",
             membership_status="active",
             subscription_expires_at=(
-                datetime.utcnow() + timedelta(days=30)
+                datetime.now(timezone.utc) + timedelta(days=30)
             ).isoformat(),
         )
 
@@ -281,16 +281,15 @@ class TestPhase3E2ESmokeTests:
             updated_at="2024-01-01T00:00:00Z",
             membership_tier="creator_pro",
             membership_status="expired",
-            subscription_expires_at=(datetime.utcnow() - timedelta(days=1)).isoformat(),
+            subscription_expires_at=(
+                datetime.now(timezone.utc) - timedelta(days=1)
+            ).isoformat(),
         )
 
         # Expired user should be blocked even if tier indicates creator_pro
         assert expired_user.membership_status == "expired"
         # In real flow, handler would check expiration and block access
 
-    @pytest.mark.xfail(
-        reason="Phase 3 membership/premium features not yet scheduled for implementation"
-    )
     def test_frontend_components_referenced(self):
         """Smoke test: Verify Phase 3 frontend components exist."""
         import os
@@ -305,9 +304,6 @@ class TestPhase3E2ESmokeTests:
             "/mnt/ai-enterprise-machine-shared-disk/projects/zenos/zenos-frontend/src/hooks/usePremiumFunnel.ts"
         )
 
-    @pytest.mark.xfail(
-        reason="Phase 3 membership/premium features not yet scheduled for implementation"
-    )
     def test_database_migration_exists(self):
         """Smoke test: Verify Phase 3 migration file exists and is readable."""
         import os
@@ -321,9 +317,6 @@ class TestPhase3E2ESmokeTests:
             assert "premium_article_reads" in content
             assert "premium_funnel_events" in content
 
-    @pytest.mark.xfail(
-        reason="Phase 3 membership/premium features not yet scheduled for implementation"
-    )
     def test_membership_service_handler_routes_exist(self):
         """Smoke test: Verify membership API handler is registered."""
         import os
@@ -335,9 +328,6 @@ class TestPhase3E2ESmokeTests:
             assert "handle_membership" in content
             assert "/api/membership/plans" in content or "membership/plans" in content
 
-    @pytest.mark.xfail(
-        reason="Phase 3 membership/premium features not yet scheduled for implementation"
-    )
     def test_index_router_includes_membership_route(self):
         """Smoke test: Verify main router includes membership handler import."""
         import os
@@ -350,7 +340,7 @@ class TestPhase3E2ESmokeTests:
             assert "/api/membership" in content
 
 
-class TestPhase3RegressionSmoke:
+class TestMembershipRegressionSmoke:
     """Smoke tests verifying no regressions in existing functionality."""
 
     @pytest.mark.asyncio
@@ -391,7 +381,7 @@ class TestPhase3RegressionSmoke:
         assert user.membership_tier == "free"  # Default value
 
 
-class TestPhase3VulnerabilitySmoke:
+class TestMembershipSecuritySmoke:
     """Smoke tests for security implications of Phase 3."""
 
     def test_paywall_cannot_be_bypassed_locally(self):

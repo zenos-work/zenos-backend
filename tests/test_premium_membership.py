@@ -10,7 +10,7 @@ from api.membership.service import MembershipService
 from models.article.model import Article
 from models.article.requests import ArticleCreateRequest, ArticleUpdateRequest
 from models.user.model import User
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 
 # ─── Fixtures ──────────────────────────────────────────────────
@@ -137,7 +137,7 @@ class TestMembershipService:
         """Premium user can read premium articles."""
         service = MembershipService(mock_env, mock_ctx)
 
-        expires = (datetime.utcnow() + timedelta(days=30)).isoformat()
+        expires = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
 
         mock_env.DB.first = AsyncMock(
             return_value={
@@ -264,7 +264,7 @@ class TestMembershipService:
         service = MembershipService(mock_env, mock_ctx)
 
         # Set expiration in the past
-        expired_date = (datetime.utcnow() - timedelta(days=1)).isoformat()
+        expired_date = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
 
         mock_env.DB.first = AsyncMock(
             return_value={
@@ -346,7 +346,7 @@ class TestArticlePaywall:
 # ─── Regression Tests: Existing Functionality ──────────────────
 
 
-class TestPhase3Regression:
+class TestPremiumRegression:
     """Regression tests to ensure Phase 3 doesn't break existing functionality."""
 
     @pytest.mark.asyncio
@@ -408,7 +408,7 @@ class TestPhase3Regression:
 # ─── Smoke Tests: Critical Paths ──────────────────────────────
 
 
-class TestPhase3SmokePath:
+class TestPremiumSmokePath:
     """Smoke tests for critical Phase 3 functionality."""
 
     @pytest.mark.asyncio

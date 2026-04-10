@@ -6,7 +6,7 @@ Internal environment promotion system within OmniFlow.
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, List
 from enum import Enum
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 
 
@@ -170,7 +170,7 @@ class PromotionService:
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
 
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         try:
             await (
                 self.db.prepare(query)
@@ -199,7 +199,7 @@ class PromotionService:
         notes: Optional[str] = None,
     ) -> bool:
         """Approve a promotion request"""
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
 
         query = """
             UPDATE workflow_promotions

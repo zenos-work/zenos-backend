@@ -356,6 +356,17 @@ class FakeFeatureFlagService:
             raise ValueError("Flag not found")
         return {"id": flag_id, "is_active": False}
 
+    async def preview_announcement(self, payload):
+        self.calls.append(("preview_announcement", payload.get("flag_key")))
+        return {
+            "action": payload.get("action", "enabled"),
+            "message": "Preview message",
+            "scope": "global",
+            "channels": ["in_app", "email"],
+            "recipient_count": 12,
+            "channel_recipient_counts": {"in_app": 12, "email": 4},
+        }
+
 
 # ═══════════════════════════════════════════════════════════════
 # Test helpers
@@ -522,6 +533,20 @@ class TestFeatureFlagsAdmin:
         )
         assert resp.status_code == 201
         assert resp.json()["flag_key"] == "new_feature"
+
+    def test_preview_announcement(self, client, svc):
+        resp = client.post(
+            "/api/admin/feature-flags/preview-announcement",
+            headers={"Authorization": f"Bearer {_admin_token()}"},
+            json_body={
+                "flag_key": "preview_feature",
+                "name": "Preview Feature",
+                "action": "enabled",
+            },
+        )
+        assert resp.status_code == 200
+        assert resp.json()["message"] == "Preview message"
+        assert resp.json()["channels"] == ["in_app", "email"]
 
     def test_create_flag_invalid_category(self, client, svc):
         resp = client.post(

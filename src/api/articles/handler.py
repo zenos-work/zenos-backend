@@ -8,6 +8,10 @@ from models.article.requests import (
 )
 from api.articles.service import ArticleService
 from api.membership.service import MembershipService
+from api.feature_flags.service import FeatureFlagService
+
+
+COLLABORATION_FLAG_KEY = "collaboration_coauthor"
 
 
 async def handle_articles(request, env, path, method, query, ctx):
@@ -15,6 +19,12 @@ async def handle_articles(request, env, path, method, query, ctx):
     parts = path.rstrip("/").split("/")
     art_id = parts[3] if len(parts) > 3 else None
     action = parts[4] if len(parts) > 4 else None
+    single_author_mode = str(getattr(env, "SINGLE_AUTHOR_MODE", "true")).lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
 
     # GET /api/articles
     if method == "GET" and not art_id:
@@ -174,7 +184,19 @@ async def handle_articles(request, env, path, method, query, ctx):
         article = await svc.get_by_id_or_slug(art_id)
         if not article:
             return error("Article not found", 404)
-        if article.author_id != user["sub"] and not require_role(user, ["SUPERADMIN"]):
+        collaboration_enabled = False
+        if not single_author_mode:
+            flag_svc = FeatureFlagService(env, ctx)
+            collaboration_enabled = await flag_svc.evaluate_one(
+                COLLABORATION_FLAG_KEY,
+                user_id=user["sub"],
+                user_role=user.get("role", ""),
+                org_id=getattr(article, "org_id", None),
+            )
+        owner_override_allowed = (
+            require_role(user, ["SUPERADMIN"]) and collaboration_enabled
+        )
+        if article.author_id != user["sub"] and not owner_override_allowed:
             return error("Forbidden", 403)
         if article.status not in ArticleStatus.EDITABLE:
             return error("Can only edit DRAFT or REJECTED articles", 409)
@@ -196,7 +218,18 @@ async def handle_articles(request, env, path, method, query, ctx):
         owner = await svc.get_owner(art_id)
         if not owner:
             return error("Article not found", 404)
-        if owner != user["sub"] and not require_role(user, ["SUPERADMIN"]):
+        collaboration_enabled = False
+        if not single_author_mode:
+            flag_svc = FeatureFlagService(env, ctx)
+            collaboration_enabled = await flag_svc.evaluate_one(
+                COLLABORATION_FLAG_KEY,
+                user_id=user["sub"],
+                user_role=user.get("role", ""),
+            )
+        owner_override_allowed = (
+            require_role(user, ["SUPERADMIN"]) and collaboration_enabled
+        )
+        if owner != user["sub"] and not owner_override_allowed:
             return error("Forbidden", 403)
         await svc.delete(art_id)
         return json_resp({"deleted": True})

@@ -5,7 +5,7 @@ from api.social.service import SocialService
 from api.articles.service import ArticleService
 
 
-class TestPhase2Reactions:
+class TestReactionTypes:
     """Test GAP-011: Reaction intents completion and UX consistency"""
 
     def test_reaction_types_constants(self):
@@ -27,7 +27,7 @@ class TestPhase2Reactions:
             assert rtype.islower()
 
 
-class TestPhase2RelatedArticles:
+class TestRelatedArticles:
     """Test GAP-012: Article-side trending/related module parity"""
 
     def test_article_service_has_related_method(self):
@@ -41,7 +41,7 @@ class TestPhase2RelatedArticles:
         assert hasattr(ArticleRepository, "find_related")
 
 
-class TestPhase2Comments:
+class TestCommentModerationHooks:
     """Test GAP-013: Comment depth and moderation hooks"""
 
     def test_comment_service_has_moderation_methods(self):
@@ -53,7 +53,7 @@ class TestPhase2Comments:
         assert hasattr(CommentService, "list_replies")
 
 
-class TestPhase2SocialProof:
+class TestSocialProofFeatures:
     """Test GAP-014: Share proof and interaction feedback parity"""
 
     def test_social_service_has_share_tracking(self):
@@ -62,13 +62,13 @@ class TestPhase2SocialProof:
         assert hasattr(SocialService, "get_share_stats")
 
 
-class TestPhase2EngagementMetrics:
+class TestEngagementMetrics:
     """Test overall engagement metrics tracking"""
 
     def test_article_tracks_engagement_counters(self):
         """Verify article model tracks engagement metrics"""
         from models.article.model import Article
-        from datetime import datetime
+        from datetime import datetime, timezone
 
         # Create a test article instance
         article = Article(
@@ -81,7 +81,7 @@ class TestPhase2EngagementMetrics:
             status="PUBLISHED",
             is_featured=False,
             read_time_minutes=5,
-            created_at=datetime.utcnow().isoformat(),
+            created_at=datetime.now(timezone.utc).isoformat(),
             likes_count=5,
             comments_count=3,
             shares_count=2,
