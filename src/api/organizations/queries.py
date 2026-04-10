@@ -33,9 +33,7 @@ INSERT_MEMBER = (
 )
 
 SELECT_MEMBERS = (
-    "SELECT * FROM org_members WHERE org_id = ?"
-    " ORDER BY joined_at ASC"
-    " LIMIT ? OFFSET ?"
+    "SELECT * FROM org_members WHERE org_id = ? ORDER BY joined_at ASC LIMIT ? OFFSET ?"
 )
 
 COUNT_MEMBERS = "SELECT COUNT(*) AS c FROM org_members WHERE org_id = ?"
@@ -54,9 +52,7 @@ INSERT_TEAM = (
     " VALUES (?, ?, ?, NULLIF(?, ''), ?)"
 )
 
-SELECT_TEAMS = (
-    "SELECT * FROM teams WHERE org_id = ?" " ORDER BY name ASC" " LIMIT ? OFFSET ?"
-)
+SELECT_TEAMS = "SELECT * FROM teams WHERE org_id = ? ORDER BY name ASC LIMIT ? OFFSET ?"
 
 COUNT_TEAMS = "SELECT COUNT(*) AS c FROM teams WHERE org_id = ?"
 
@@ -67,7 +63,7 @@ INSERT_TEAM_MEMBER = (
 DELETE_TEAM_MEMBER = "DELETE FROM team_members WHERE team_id = ? AND user_id = ?"
 
 SELECT_TEAM_MEMBERS = (
-    "SELECT * FROM team_members WHERE team_id = ?" " ORDER BY added_at ASC"
+    "SELECT * FROM team_members WHERE team_id = ? ORDER BY added_at ASC"
 )
 
 # ── Invitations ────────────────────────────────────────────────────────────

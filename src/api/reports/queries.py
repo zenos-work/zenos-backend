@@ -6,9 +6,7 @@ INSERT_REPORT = (
 
 SELECT_BY_ID = "SELECT * FROM content_reports WHERE id = ?"
 
-SELECT_ALL = (
-    "SELECT * FROM content_reports" " ORDER BY created_at DESC" " LIMIT ? OFFSET ?"
-)
+SELECT_ALL = "SELECT * FROM content_reports ORDER BY created_at DESC LIMIT ? OFFSET ?"
 
 SELECT_BY_STATUS = (
     "SELECT * FROM content_reports"

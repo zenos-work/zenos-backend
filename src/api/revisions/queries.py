@@ -8,7 +8,7 @@ SELECT_BY_ARTICLE = (
 COUNT_BY_ARTICLE = "SELECT COUNT(*) AS c FROM article_revisions WHERE article_id = ?"
 
 SELECT_BY_ARTICLE_AND_VERSION = (
-    "SELECT * FROM article_revisions" " WHERE article_id = ? AND version_number = ?"
+    "SELECT * FROM article_revisions WHERE article_id = ? AND version_number = ?"
 )
 
 SELECT_LATEST_VERSION = (

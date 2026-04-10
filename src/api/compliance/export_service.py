@@ -12,7 +12,7 @@ class ExportService(BaseRepository):
     )
 
     SELECT_EXPORT_REQUEST = (
-        "SELECT * FROM data_export_requests" " WHERE id = ? AND user_id = ?" " LIMIT 1"
+        "SELECT * FROM data_export_requests WHERE id = ? AND user_id = ? LIMIT 1"
     )
 
     def __init__(self, db, ctx=None):

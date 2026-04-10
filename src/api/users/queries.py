@@ -38,9 +38,9 @@ UPDATE_PROFILE = (
 
 CHECK_HANDLE_UNIQUE = "SELECT id FROM users WHERE handle = ? AND id != ? LIMIT 1"
 
-UPDATE_ROLE = "UPDATE users SET role = ?," ' updated_at = datetime("now") WHERE id = ?'
+UPDATE_ROLE = 'UPDATE users SET role = ?, updated_at = datetime("now") WHERE id = ?'
 
-UPDATE_SELF_ROLE = "UPDATE users SET role = ?" " WHERE id = ? AND role = ?"
+UPDATE_SELF_ROLE = "UPDATE users SET role = ? WHERE id = ? AND role = ?"
 
 UPDATE_PREFS = (
     "UPDATE user_preferences SET topics = ?, email_notifs = ?, theme = ?,"

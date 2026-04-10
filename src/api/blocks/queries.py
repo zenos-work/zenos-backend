@@ -4,8 +4,7 @@ INSERT_BLOCK = (
 )
 
 DELETE_BLOCK = (
-    "DELETE FROM user_blocks"
-    " WHERE blocker_id = ? AND blocked_id = ? AND block_type = ?"
+    "DELETE FROM user_blocks WHERE blocker_id = ? AND blocked_id = ? AND block_type = ?"
 )
 
 SELECT_BY_BLOCKER = (
@@ -15,7 +14,7 @@ SELECT_BY_BLOCKER = (
 )
 
 COUNT_BY_BLOCKER = (
-    "SELECT COUNT(*) AS c FROM user_blocks" " WHERE blocker_id = ? AND block_type = ?"
+    "SELECT COUNT(*) AS c FROM user_blocks WHERE blocker_id = ? AND block_type = ?"
 )
 
 SELECT_IS_BLOCKED = (

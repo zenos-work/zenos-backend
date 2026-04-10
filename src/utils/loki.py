@@ -6,7 +6,7 @@ from .log_models import LogEntry
 
 class LokiForwarder:
     def __init__(self, url: str, user: str = None, password: str = None):
-        self.push_url = f'{url.rstrip("/")}/loki/api/v1/push'
+        self.push_url = f"{url.rstrip('/')}/loki/api/v1/push"
         self.user = user
         self.password = password
 

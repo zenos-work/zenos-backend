@@ -6,7 +6,7 @@ SELECT_BY_USER = (
 )
 
 COUNT_BY_USER = (
-    "SELECT COUNT(*) AS c FROM user_sessions" " WHERE user_id = ? AND is_revoked = 0"
+    "SELECT COUNT(*) AS c FROM user_sessions WHERE user_id = ? AND is_revoked = 0"
 )
 
 SELECT_BY_ID = "SELECT * FROM user_sessions WHERE id = ? AND user_id = ?"

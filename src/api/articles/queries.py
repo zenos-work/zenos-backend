@@ -72,8 +72,7 @@ SELECT_PUBLISHED_SEARCH = SELECT_PUBLISHED_SEARCH_NEWEST
 SELECT_BY_ID_OR_SLUG = SELECT_BASE + " WHERE a.id = ? OR a.slug = ?"
 
 SELECT_BY_AUTHOR = (
-    SELECT_BASE + " WHERE a.author_id = ?"
-    " ORDER BY a.updated_at DESC LIMIT ? OFFSET ?"
+    SELECT_BASE + " WHERE a.author_id = ? ORDER BY a.updated_at DESC LIMIT ? OFFSET ?"
 )
 
 SELECT_BY_AUTHOR_AND_STATUS = (
@@ -110,7 +109,7 @@ UPDATE_ARTICLE = (
 )
 
 UPDATE_STATUS = (
-    'UPDATE articles SET status = ?, updated_at = datetime("now")' " WHERE id = ?"
+    'UPDATE articles SET status = ?, updated_at = datetime("now") WHERE id = ?'
 )
 
 UPDATE_APPROVE = (
@@ -175,7 +174,7 @@ INSERT_ARTICLE_TAG = (
 DELETE_ARTICLE_TAGS = "DELETE FROM article_tags WHERE article_id = ?"
 
 SELECT_APPROVER_IDS = (
-    "SELECT id FROM users" " WHERE role IN ('APPROVER', 'SUPERADMIN') AND is_active = 1"
+    "SELECT id FROM users WHERE role IN ('APPROVER', 'SUPERADMIN') AND is_active = 1"
 )
 
 INSERT_NOTIFICATION = (
@@ -192,10 +191,7 @@ SELECT_CONTENT_TYPES_PUBLIC = (
 )
 
 SELECT_CONTENT_TYPE_EXISTS = (
-    "SELECT 1 AS ok"
-    " FROM content_types"
-    " WHERE slug = ? AND is_active = 1"
-    " LIMIT 1"
+    "SELECT 1 AS ok FROM content_types WHERE slug = ? AND is_active = 1 LIMIT 1"
 )
 
 # Phase 2: Related articles by sharing tags, trending sort

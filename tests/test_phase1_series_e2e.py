@@ -419,9 +419,10 @@ class TestSeriesHandlerHappyPath:
         query = {}
         fake_user = {"sub": "author-001"}
 
-        with patch(
-            "api.series.handler.get_user", new=AsyncMock(return_value=fake_user)
-        ), patch("api.series.handler.SeriesService") as MockSvc:
+        with (
+            patch("api.series.handler.get_user", new=AsyncMock(return_value=fake_user)),
+            patch("api.series.handler.SeriesService") as MockSvc,
+        ):
             mock_svc_instance = AsyncMock()
             MockSvc.return_value = mock_svc_instance
             mock_svc_instance.create = AsyncMock(return_value=sample_series)
@@ -445,9 +446,10 @@ class TestSeriesHandlerHappyPath:
 
         paginated = PaginatedResponse(items=[sample_series], page=1, limit=20, total=1)
 
-        with patch(
-            "api.series.handler.get_user", new=AsyncMock(return_value=fake_user)
-        ), patch("api.series.handler.SeriesService") as MockSvc:
+        with (
+            patch("api.series.handler.get_user", new=AsyncMock(return_value=fake_user)),
+            patch("api.series.handler.SeriesService") as MockSvc,
+        ):
             mock_svc_instance = AsyncMock()
             MockSvc.return_value = mock_svc_instance
             mock_svc_instance.list_by_author = AsyncMock(return_value=paginated)
@@ -470,9 +472,10 @@ class TestSeriesHandlerHappyPath:
         query = {}
         fake_user = {"sub": "author-001"}
 
-        with patch(
-            "api.series.handler.get_user", new=AsyncMock(return_value=fake_user)
-        ), patch("api.series.handler.SeriesService") as MockSvc:
+        with (
+            patch("api.series.handler.get_user", new=AsyncMock(return_value=fake_user)),
+            patch("api.series.handler.SeriesService") as MockSvc,
+        ):
             mock_svc_instance = AsyncMock()
             MockSvc.return_value = mock_svc_instance
             mock_svc_instance.get_by_id = AsyncMock(return_value=None)
@@ -491,9 +494,10 @@ class TestSeriesHandlerHappyPath:
         query = {}
         fake_user = {"sub": "author-001"}
 
-        with patch(
-            "api.series.handler.get_user", new=AsyncMock(return_value=fake_user)
-        ), patch("api.series.handler.SeriesService") as MockSvc:
+        with (
+            patch("api.series.handler.get_user", new=AsyncMock(return_value=fake_user)),
+            patch("api.series.handler.SeriesService") as MockSvc,
+        ):
             mock_svc_instance = AsyncMock()
             MockSvc.return_value = mock_svc_instance
             mock_svc_instance.delete = AsyncMock(return_value=False)
@@ -515,9 +519,10 @@ class TestSeriesHandlerHappyPath:
 
         paginated = PaginatedResponse(items=[], page=1, limit=100, total=0)
 
-        with patch(
-            "api.series.handler.get_user", new=AsyncMock(return_value=fake_user)
-        ), patch("api.series.handler.SeriesService") as MockSvc:
+        with (
+            patch("api.series.handler.get_user", new=AsyncMock(return_value=fake_user)),
+            patch("api.series.handler.SeriesService") as MockSvc,
+        ):
             mock_svc_instance = AsyncMock()
             MockSvc.return_value = mock_svc_instance
             mock_svc_instance.list_by_author = AsyncMock(return_value=paginated)
@@ -631,9 +636,13 @@ class TestArticleSeriesIntegration:
         req.url = "https://test.local/api/articles/unknown-id/series"
         req.headers = {}
 
-        with patch(
-            "api.articles.handler.get_user", new=AsyncMock(return_value={"sub": "u1"})
-        ), patch("api.series.service.SeriesService") as MockSeriesSvc:
+        with (
+            patch(
+                "api.articles.handler.get_user",
+                new=AsyncMock(return_value={"sub": "u1"}),
+            ),
+            patch("api.series.service.SeriesService") as MockSeriesSvc,
+        ):
             mock_ss = AsyncMock()
             MockSeriesSvc.return_value = mock_ss
             mock_ss.get_article_series = AsyncMock(return_value=None)

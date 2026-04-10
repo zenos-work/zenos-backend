@@ -83,12 +83,11 @@ INSERT_NOTIFICATION = (
 )
 
 UPDATE_MARK_NOTIFICATIONS_READ = (
-    "UPDATE notifications SET is_read = 1" " WHERE user_id = ? AND is_read = 0"
+    "UPDATE notifications SET is_read = 1 WHERE user_id = ? AND is_read = 0"
 )
 
 UPDATE_MARK_NOTIFICATION_READ_BY_ID = (
-    "UPDATE notifications SET is_read = 1"
-    " WHERE user_id = ? AND id = ? AND is_read = 0"
+    "UPDATE notifications SET is_read = 1 WHERE user_id = ? AND id = ? AND is_read = 0"
 )
 
 SELECT_CONTENT_TYPES_ADMIN = (

@@ -6,9 +6,7 @@ INSERT_AUDIT = (
 )
 
 SELECT_AUDIT_BY_ORG = (
-    "SELECT * FROM audit_log WHERE org_id = ?"
-    " ORDER BY created_at DESC"
-    " LIMIT ? OFFSET ?"
+    "SELECT * FROM audit_log WHERE org_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?"
 )
 
 COUNT_AUDIT_BY_ORG = "SELECT COUNT(*) AS c FROM audit_log WHERE org_id = ?"

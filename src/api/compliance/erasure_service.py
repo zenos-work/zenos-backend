@@ -17,9 +17,7 @@ class ErasureService(BaseRepository):
         " ORDER BY execute_after ASC"
     )
 
-    SELECT_ERASURE_REQUEST = (
-        "SELECT * FROM data_erasure_requests" " WHERE id = ?" " LIMIT 1"
-    )
+    SELECT_ERASURE_REQUEST = "SELECT * FROM data_erasure_requests WHERE id = ? LIMIT 1"
 
     UPDATE_ERASURE_EXECUTED = (
         "UPDATE data_erasure_requests"

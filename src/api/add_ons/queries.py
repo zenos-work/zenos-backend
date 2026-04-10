@@ -6,7 +6,7 @@ INSERT_ADD_ON = (
 )
 
 SELECT_ADD_ONS_BY_ORG = (
-    "SELECT * FROM org_add_ons WHERE org_id = ?" " ORDER BY created_at DESC"
+    "SELECT * FROM org_add_ons WHERE org_id = ? ORDER BY created_at DESC"
 )
 
 SELECT_ADD_ON_BY_ORG_TYPE = (

@@ -94,7 +94,7 @@ class TestAIDetectionService:
         for ai_prob in [0.15, 0.50, 0.85]:
             content = "x " * 100  # Generic content
             result = await service.scan_article(
-                f"article-{int(ai_prob*100)}", content, use_external_api=False
+                f"article-{int(ai_prob * 100)}", content, use_external_api=False
             )
 
             # Verify decision threshold logic

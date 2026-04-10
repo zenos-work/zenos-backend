@@ -83,8 +83,7 @@ COUNT_FOLLOWING = (
     " WHERE follower_id = ? AND following_type = 'user'"
 )
 SELECT_FOLLOWING_IDS = (
-    "SELECT following_id FROM follows"
-    " WHERE follower_id = ? AND following_type = 'user'"
+    "SELECT following_id FROM follows WHERE follower_id = ? AND following_type = 'user'"
 )
 SELECT_FOLLOWERS_COUNT = (
     "SELECT COUNT(*) AS c FROM follows"
