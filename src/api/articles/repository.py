@@ -389,3 +389,18 @@ class ArticleRepository(BaseRepository):
             comment_val,
             message,
         )
+
+    # ── Phase 3 Step 18: Security-level aware queries ──────────────────
+    async def find_org_articles(
+        self, org_id: str, user_id: str, limit: int, offset: int
+    ) -> list:
+        rows = await self.find_all(
+            Q.SELECT_ORG_ARTICLES,
+            org_id,
+            user_id,
+            user_id,
+            user_id,
+            limit,
+            offset,
+        )
+        return self.map_many(rows, Article)

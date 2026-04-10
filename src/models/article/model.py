@@ -13,6 +13,7 @@ _LIST_FIELDS = {
     "content_type",
     "status",
     "author_id",
+    "org_id",
     "cover_image_url",
     "read_time_minutes",
     "reading_level",
@@ -21,6 +22,11 @@ _LIST_FIELDS = {
     "dislikes_count",
     "shares_count",
     "comments_count",
+    "claps_count",
+    "bookmarks_count",
+    "report_count",
+    "highlight_count",
+    "tip_total_cents",
     "is_featured",
     "published_at",
     "created_at",
@@ -40,8 +46,10 @@ _LIST_FIELDS = {
     "is_expired",
     "premium_only",
     "premium_teaser_words",
+    "security_level",
+    "scheduled_publish_date",
 }
-_DETAIL_FIELDS = _LIST_FIELDS | {"content", "updated_at"}
+_DETAIL_FIELDS = _LIST_FIELDS | {"content", "updated_at", "current_revision"}
 _ADMIN_FIELDS = _DETAIL_FIELDS | {"rejection_note", "approved_by"}
 
 
@@ -89,6 +97,16 @@ class Article(BaseModel):
     tags: list = field(default_factory=list)
     premium_only: int = 0
     premium_teaser_words: int = 300
+    # New fields
+    org_id: Optional[str] = None
+    claps_count: int = 0
+    bookmarks_count: int = 0
+    report_count: int = 0
+    highlight_count: int = 0
+    tip_total_cents: int = 0
+    current_revision: int = 1
+    security_level: str = "public"
+    scheduled_publish_date: Optional[str] = None
 
     def to_dict(self, scope: str = Scope.LIST) -> dict:
         allowed = {
@@ -164,4 +182,13 @@ class Article(BaseModel):
             author_avatar=row_get(row, "author_avatar"),
             premium_only=row_get(row, "premium_only", 0),
             premium_teaser_words=row_get(row, "premium_teaser_words", 300),
+            org_id=row_get(row, "org_id"),
+            claps_count=row_get(row, "claps_count", 0),
+            bookmarks_count=row_get(row, "bookmarks_count", 0),
+            report_count=row_get(row, "report_count", 0),
+            highlight_count=row_get(row, "highlight_count", 0),
+            tip_total_cents=row_get(row, "tip_total_cents", 0),
+            current_revision=row_get(row, "current_revision", 1),
+            security_level=row_get(row, "security_level", "public"),
+            scheduled_publish_date=row_get(row, "scheduled_publish_date"),
         )

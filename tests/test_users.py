@@ -89,7 +89,7 @@ class TestUpdateProfileRequest:
         assert req.avatar_url == "https://example.com/avatar.jpg"
 
     def test_rejects_empty_update(self):
-        with pytest.raises(ValueError, match="At least name or avatar_url"):
+        with pytest.raises(ValueError, match="At least one profile field"):
             UpdateProfileRequest.from_body({})
 
     def test_rejects_empty_name(self):

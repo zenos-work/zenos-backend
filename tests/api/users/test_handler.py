@@ -65,7 +65,7 @@ class _Svc:
     async def update_profile(self, user_id, req, skip_name_update=False):
         return None
 
-    async def update_prefs(self, user_id, topics, email_notifs, theme):
+    async def update_prefs(self, user_id, topics, email_notifs, theme, **kwargs):
         return None
 
     async def self_upgrade_to_author(self, user_id):

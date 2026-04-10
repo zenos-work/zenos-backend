@@ -1,7 +1,10 @@
 SELECT_BY_ID = "SELECT * FROM users WHERE id = ?"
 
 SELECT_PUBLIC_BY_ID = (
-    "SELECT id, name, role, avatar_url, created_at FROM users WHERE id = ?"
+    "SELECT id, name, role, avatar_url, created_at,"
+    " handle, bio, website_url, social_links, location,"
+    " cover_image_url, pronouns, tagline, membership_tier"
+    " FROM users WHERE id = ?"
 )
 
 SELECT_ALL_USERS = (
@@ -22,8 +25,18 @@ INSERT_PREFS = "INSERT OR IGNORE INTO user_preferences (user_id) VALUES (?)"
 
 UPDATE_PROFILE = (
     "UPDATE users SET name = ?, avatar_url = NULLIF(?, ''),"
+    " handle = COALESCE(NULLIF(?, ''), handle),"
+    " bio = COALESCE(NULLIF(?, ''), bio),"
+    " website_url = COALESCE(NULLIF(?, ''), website_url),"
+    " social_links = COALESCE(NULLIF(?, ''), social_links),"
+    " location = COALESCE(NULLIF(?, ''), location),"
+    " cover_image_url = COALESCE(NULLIF(?, ''), cover_image_url),"
+    " pronouns = COALESCE(NULLIF(?, ''), pronouns),"
+    " tagline = COALESCE(NULLIF(?, ''), tagline),"
     ' updated_at = datetime("now") WHERE id = ?'
 )
+
+CHECK_HANDLE_UNIQUE = "SELECT id FROM users WHERE handle = ? AND id != ? LIMIT 1"
 
 UPDATE_ROLE = "UPDATE users SET role = ?," ' updated_at = datetime("now") WHERE id = ?'
 
@@ -31,6 +44,8 @@ UPDATE_SELF_ROLE = "UPDATE users SET role = ?" " WHERE id = ? AND role = ?"
 
 UPDATE_PREFS = (
     "UPDATE user_preferences SET topics = ?, email_notifs = ?, theme = ?,"
+    " font_family = ?, font_size = ?, content_width = ?, line_height = ?,"
+    " code_theme = ?,"
     ' updated_at = datetime("now") WHERE user_id = ?'
 )
 

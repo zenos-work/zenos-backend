@@ -131,6 +131,8 @@ class AdminService:
         actor_id: str = None,
         article_id: str = None,
         comment_id: str = None,
+        channel: str = "in_app",
+        group_key: str = None,
     ) -> None:
         await self._repo.insert_notification(
             new_id(),
@@ -140,6 +142,8 @@ class AdminService:
             article_id,
             comment_id,
             message,
+            channel,
+            group_key,
         )
 
     async def list_content_types(self) -> dict:

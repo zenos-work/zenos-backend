@@ -210,13 +210,13 @@ class FakeSocialService:
             raise ValueError("Not found")
         return article_id == "bookmarked"
 
-    async def toggle_follow(self, user_id, target_user_id, add):
+    async def toggle_follow(self, user_id, target_user_id, add, following_type="user"):
         self.calls.append(("toggle_follow", user_id, target_user_id, add))
         if target_user_id == "already-followed" and add:
             raise ValueError("Already followed")
         return SocialActionResult(action="follow", target_id=target_user_id, active=add)
 
-    async def check_following(self, user_id, target_user_id):
+    async def check_following(self, user_id, target_user_id, following_type="user"):
         self.calls.append(("check_following", user_id, target_user_id))
         if target_user_id == "missing":
             raise ValueError("Not found")

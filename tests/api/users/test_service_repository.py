@@ -42,7 +42,7 @@ class _Repo:
     async def update_avatar_only(self, user_id, avatar_url):
         self.calls.append(("update_avatar_only", user_id, avatar_url))
 
-    async def update_profile(self, user_id, name, avatar_url):
+    async def update_profile(self, user_id, name, avatar_url, **kwargs):
         self.calls.append(("update_profile", user_id, name, avatar_url))
 
     async def self_upgrade_role(self, user_id, new_role, current_role):
@@ -64,7 +64,10 @@ class _Repo:
         self.calls.append(("find_prefs", user_id))
         return {"topics": '["ai"]', "email_notifs": 1, "theme": "dark"}
 
-    async def update_prefs(self, user_id, topics, email_notifs, theme):
+    async def check_handle_unique(self, handle, user_id):
+        return True
+
+    async def update_prefs(self, user_id, topics, email_notifs, theme, *args, **kwargs):
         self.calls.append(("update_prefs", user_id, topics, email_notifs, theme))
 
     async def find_reading_history(self, user_id, limit, offset):
@@ -121,6 +124,14 @@ class _ReqProfile:
     def __init__(self, name=None, avatar_url=None):
         self.name = name
         self.avatar_url = avatar_url
+        self.handle = None
+        self.bio = None
+        self.website_url = None
+        self.social_links = None
+        self.location = None
+        self.cover_image_url = None
+        self.pronouns = None
+        self.tagline = None
 
 
 @pytest.fixture

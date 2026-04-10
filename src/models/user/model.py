@@ -3,7 +3,22 @@ from typing import Optional
 from models.base import BaseModel, row_get
 from models.common.enums import Scope
 
-_PUBLIC_FIELDS = {"id", "name", "role", "avatar_url", "created_at", "membership_tier"}
+_PUBLIC_FIELDS = {
+    "id",
+    "name",
+    "role",
+    "avatar_url",
+    "created_at",
+    "membership_tier",
+    "handle",
+    "bio",
+    "website_url",
+    "social_links",
+    "location",
+    "cover_image_url",
+    "pronouns",
+    "tagline",
+}
 _PRIVATE_FIELDS = _PUBLIC_FIELDS | {
     "email",
     "is_active",
@@ -12,11 +27,15 @@ _PRIVATE_FIELDS = _PUBLIC_FIELDS | {
     "membership_status",
     "subscription_started_at",
     "subscription_expires_at",
+    "payout_method",
+    "payout_email",
+    "payout_min_cents",
 }
 _ADMIN_FIELDS = _PRIVATE_FIELDS | {
     "google_id",
     "stripe_customer_id",
     "stripe_subscription_id",
+    "stripe_connect_id",
     "premium_read_count",
     "last_premium_read_at",
 }
@@ -48,6 +67,20 @@ class User(BaseModel):
     stripe_subscription_id: Optional[str] = None
     premium_read_count: int = 0
     last_premium_read_at: Optional[str] = None
+    # Profile fields
+    handle: Optional[str] = None
+    bio: Optional[str] = None
+    website_url: Optional[str] = None
+    social_links: Optional[str] = None
+    location: Optional[str] = None
+    cover_image_url: Optional[str] = None
+    pronouns: Optional[str] = None
+    tagline: Optional[str] = None
+    # Payout fields
+    payout_method: str = "stripe"
+    payout_email: Optional[str] = None
+    payout_min_cents: int = 5000
+    stripe_connect_id: Optional[str] = None
 
     def to_dict(self, scope: str = Scope.PUBLIC) -> dict:
         allowed = _SCOPE_MAP.get(scope, _PUBLIC_FIELDS)
@@ -72,6 +105,18 @@ class User(BaseModel):
                 "stripe_subscription_id": self.stripe_subscription_id,
                 "premium_read_count": self.premium_read_count,
                 "last_premium_read_at": self.last_premium_read_at,
+                "handle": self.handle,
+                "bio": self.bio,
+                "website_url": self.website_url,
+                "social_links": self.social_links,
+                "location": self.location,
+                "cover_image_url": self.cover_image_url,
+                "pronouns": self.pronouns,
+                "tagline": self.tagline,
+                "payout_method": self.payout_method,
+                "payout_email": self.payout_email,
+                "payout_min_cents": self.payout_min_cents,
+                "stripe_connect_id": self.stripe_connect_id,
             }.items()
             if k in allowed and v is not None
         }
@@ -97,4 +142,16 @@ class User(BaseModel):
             stripe_subscription_id=row_get(row, "stripe_subscription_id"),
             premium_read_count=row_get(row, "premium_read_count", 0),
             last_premium_read_at=row_get(row, "last_premium_read_at"),
+            handle=row_get(row, "handle"),
+            bio=row_get(row, "bio"),
+            website_url=row_get(row, "website_url"),
+            social_links=row_get(row, "social_links"),
+            location=row_get(row, "location"),
+            cover_image_url=row_get(row, "cover_image_url"),
+            pronouns=row_get(row, "pronouns"),
+            tagline=row_get(row, "tagline"),
+            payout_method=row_get(row, "payout_method", "stripe"),
+            payout_email=row_get(row, "payout_email"),
+            payout_min_cents=row_get(row, "payout_min_cents", 5000),
+            stripe_connect_id=row_get(row, "stripe_connect_id"),
         )

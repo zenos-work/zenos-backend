@@ -76,6 +76,9 @@ class ArticleCreateRequest(BaseRequest):
     tag_ids: List[str] = field(default_factory=list)
     premium_only: int = 0
     premium_teaser_words: int = 300
+    org_id: Optional[str] = None
+    security_level: str = "public"
+    scheduled_publish_date: Optional[str] = None
 
     @classmethod
     def _validate(cls, data: dict) -> "ArticleCreateRequest":
@@ -165,6 +168,21 @@ class ArticleCreateRequest(BaseRequest):
         if premium_teaser_words < 0 or premium_teaser_words > 2000:
             raise ValueError("premium_teaser_words must be between 0 and 2000")
 
+        org_id = _normalize_optional_text(data.get("org_id"))
+
+        security_level = data.get("security_level", "public")
+        if security_level not in {"public", "members_only", "org_only", "private"}:
+            raise ValueError(
+                "security_level must be one of: public, members_only, org_only, private"
+            )
+
+        try:
+            scheduled_publish_date = _normalize_optional_datetime(
+                data.get("scheduled_publish_date"), "scheduled_publish_date"
+            )
+        except ValueError:
+            raise ValueError("Invalid scheduled_publish_date format. Use ISO-8601")
+
         return cls(
             title=title,
             content=content,
@@ -183,6 +201,9 @@ class ArticleCreateRequest(BaseRequest):
             tag_ids=tag_ids,
             premium_only=premium_only,
             premium_teaser_words=premium_teaser_words,
+            org_id=org_id,
+            security_level=security_level,
+            scheduled_publish_date=scheduled_publish_date,
         )
 
 
@@ -207,6 +228,9 @@ class ArticleUpdateRequest(BaseRequest):
     tag_ids: Optional[List[str]] = None
     premium_only: Optional[int] = None
     premium_teaser_words: Optional[int] = None
+    org_id: Optional[str] = None
+    security_level: Optional[str] = None
+    scheduled_publish_date: Optional[str] = None
 
     @classmethod
     def _validate(cls, data: dict) -> "ArticleUpdateRequest":
@@ -297,6 +321,26 @@ class ArticleUpdateRequest(BaseRequest):
             if premium_teaser_words < 0 or premium_teaser_words > 2000:
                 raise ValueError("premium_teaser_words must be between 0 and 2000")
 
+        org_id = _normalize_optional_text(data.get("org_id"))
+
+        security_level = _normalize_optional_text(data.get("security_level"))
+        if security_level is not None and security_level not in {
+            "public",
+            "members_only",
+            "org_only",
+            "private",
+        }:
+            raise ValueError(
+                "security_level must be one of: public, members_only, org_only, private"
+            )
+
+        try:
+            scheduled_publish_date = _normalize_optional_datetime(
+                data.get("scheduled_publish_date"), "scheduled_publish_date"
+            )
+        except ValueError:
+            raise ValueError("Invalid scheduled_publish_date format. Use ISO-8601")
+
         return cls(
             title=title,
             content=content,
@@ -315,6 +359,9 @@ class ArticleUpdateRequest(BaseRequest):
             tag_ids=tag_ids,
             premium_only=premium_only,
             premium_teaser_words=premium_teaser_words,
+            org_id=org_id,
+            security_level=security_level,
+            scheduled_publish_date=scheduled_publish_date,
         )
 
 

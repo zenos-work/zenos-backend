@@ -244,30 +244,37 @@ class SocialService:
 
     # ── FOLLOWS ────────────────────────────────────
     async def toggle_follow(
-        self, follower_id: str, following_id: str, add: bool
+        self,
+        follower_id: str,
+        following_id: str,
+        add: bool,
+        following_type: str = "user",
     ) -> SocialActionResult:
-        """Follow or unfollow a user."""
-        if follower_id == following_id:
+        """Follow or unfollow a user/tag/series."""
+        if following_type == "user" and follower_id == following_id:
             raise ValueError("Cannot follow yourself")
         if add:
             try:
-                await self._repo.follow(follower_id, following_id)
+                await self._repo.follow(follower_id, following_id, following_type)
             except Exception:
                 raise ValueError("Already following")
         else:
-            await self._repo.unfollow(follower_id, following_id)
+            await self._repo.unfollow(follower_id, following_id, following_type)
         await self._analytics(
             "social.followed" if add else "social.unfollowed",
             {
                 "follower_id": follower_id,
                 "following_id": following_id,
+                "following_type": following_type,
             },
         )
         return SocialActionResult(action="follow", target_id=following_id, active=add)
 
-    async def check_following(self, follower_id: str, following_id: str) -> bool:
-        """Check if user is following another user."""
-        return await self._repo.is_following(follower_id, following_id)
+    async def check_following(
+        self, follower_id: str, following_id: str, following_type: str = "user"
+    ) -> bool:
+        """Check if user is following another entity."""
+        return await self._repo.is_following(follower_id, following_id, following_type)
 
     async def list_followers(
         self, user_id: str, page: int = 1, limit: int = 20

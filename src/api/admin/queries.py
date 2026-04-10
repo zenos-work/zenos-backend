@@ -76,8 +76,10 @@ COUNT_NOTIFICATIONS_BY_USER = (
 
 INSERT_NOTIFICATION = (
     "INSERT INTO notifications"
-    " (id, user_id, actor_id, type, article_id, comment_id, message)"
-    " VALUES (?, ?, NULLIF(?, ''), ?, NULLIF(?, ''), NULLIF(?, ''), ?)"
+    " (id, user_id, actor_id, type, article_id, comment_id, message,"
+    "  channel, delivery_status, group_key)"
+    " VALUES (?, ?, NULLIF(?, ''), ?, NULLIF(?, ''), NULLIF(?, ''), ?,"
+    "  COALESCE(NULLIF(?, ''), 'in_app'), 'pending', NULLIF(?, ''))"
 )
 
 UPDATE_MARK_NOTIFICATIONS_READ = (

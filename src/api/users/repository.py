@@ -44,9 +44,38 @@ class UserRepository(BaseRepository):
         await self.execute(Q.INSERT_PREFS, user_id)
 
     async def update_profile(
-        self, user_id: str, name: str, avatar_url: Optional[str]
+        self,
+        user_id: str,
+        name: str,
+        avatar_url: Optional[str],
+        handle: Optional[str] = None,
+        bio: Optional[str] = None,
+        website_url: Optional[str] = None,
+        social_links: Optional[str] = None,
+        location: Optional[str] = None,
+        cover_image_url: Optional[str] = None,
+        pronouns: Optional[str] = None,
+        tagline: Optional[str] = None,
     ) -> None:
-        await self.execute(Q.UPDATE_PROFILE, name, avatar_url or "", user_id)
+        await self.execute(
+            Q.UPDATE_PROFILE,
+            name,
+            avatar_url or "",
+            handle or "",
+            bio or "",
+            website_url or "",
+            social_links or "",
+            location or "",
+            cover_image_url or "",
+            pronouns or "",
+            tagline or "",
+            user_id,
+        )
+
+    async def check_handle_unique(self, handle: str, user_id: str) -> bool:
+        """Return True if handle is available for this user."""
+        row = await self.find_one(Q.CHECK_HANDLE_UNIQUE, handle, user_id)
+        return row is None
 
     async def update_avatar_only(self, user_id: str, avatar_url: Optional[str]) -> None:
         """Update only avatar, preserve existing name."""
@@ -65,9 +94,29 @@ class UserRepository(BaseRepository):
         await self.execute(Q.UPDATE_SELF_ROLE, new_role, user_id, current_role)
 
     async def update_prefs(
-        self, user_id: str, topics: str, email_notifs: int, theme: str
+        self,
+        user_id: str,
+        topics: str,
+        email_notifs: int,
+        theme: str,
+        font_family: str = "system",
+        font_size: int = 18,
+        content_width: int = 720,
+        line_height: float = 1.6,
+        code_theme: str = "github-dark",
     ) -> None:
-        await self.execute(Q.UPDATE_PREFS, topics, email_notifs, theme, user_id)
+        await self.execute(
+            Q.UPDATE_PREFS,
+            topics,
+            email_notifs,
+            theme,
+            font_family,
+            font_size,
+            content_width,
+            line_height,
+            code_theme,
+            user_id,
+        )
 
     async def find_reading_history(
         self, user_id: str, limit: int, offset: int

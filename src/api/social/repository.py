@@ -114,15 +114,27 @@ class SocialRepository(BaseRepository):
         return row_get(row, "count", 0) if row else 0
 
     # ── FOLLOWS ────────────────────────────────────
-    async def follow(self, follower_id: str, following_id: str) -> None:
-        await self.execute(Q.INSERT_FOLLOW, follower_id, following_id)
+    async def follow(
+        self, follower_id: str, following_id: str, following_type: str = "user"
+    ) -> None:
+        await self.execute(
+            Q.INSERT_FOLLOW, follower_id, following_id, following_type or ""
+        )
 
-    async def unfollow(self, follower_id: str, following_id: str) -> None:
-        await self.execute(Q.DELETE_FOLLOW, follower_id, following_id)
+    async def unfollow(
+        self, follower_id: str, following_id: str, following_type: str = "user"
+    ) -> None:
+        await self.execute(
+            Q.DELETE_FOLLOW, follower_id, following_id, following_type or ""
+        )
 
-    async def is_following(self, follower_id: str, following_id: str) -> bool:
-        """Check if user is following another user."""
-        row = await self.find_one(Q.SELECT_IF_FOLLOWING, follower_id, following_id)
+    async def is_following(
+        self, follower_id: str, following_id: str, following_type: str = "user"
+    ) -> bool:
+        """Check if user is following another entity."""
+        row = await self.find_one(
+            Q.SELECT_IF_FOLLOWING, follower_id, following_id, following_type or ""
+        )
         return bool(row)
 
     async def find_followers(self, user_id: str, limit: int, offset: int) -> list:

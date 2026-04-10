@@ -140,15 +140,15 @@ class _Repo:
         self.calls.append(("count_bookmarks", user_id))
         return self.bookmark_count
 
-    async def follow(self, follower_id, following_id):
+    async def follow(self, follower_id, following_id, following_type="user"):
         self.calls.append(("follow", follower_id, following_id))
         if self.fail_follow:
             raise Exception("duplicate")
 
-    async def unfollow(self, follower_id, following_id):
+    async def unfollow(self, follower_id, following_id, following_type="user"):
         self.calls.append(("unfollow", follower_id, following_id))
 
-    async def is_following(self, follower_id, following_id):
+    async def is_following(self, follower_id, following_id, following_type="user"):
         self.calls.append(("is_following", follower_id, following_id))
         return self.flags["following"]
 

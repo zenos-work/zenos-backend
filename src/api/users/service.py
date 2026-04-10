@@ -38,11 +38,29 @@ class UserService:
     async def update_profile(
         self, user_id: str, req: UpdateProfileRequest, skip_name_update: bool = False
     ) -> None:
+        # Validate handle uniqueness
+        if req.handle:
+            available = await self._repo.check_handle_unique(req.handle, user_id)
+            if not available:
+                raise ValueError("Handle is already taken")
+
         # For avatar-only updates, allow None name
         if skip_name_update:
             await self._repo.update_avatar_only(user_id, req.avatar_url)
         else:
-            await self._repo.update_profile(user_id, req.name, req.avatar_url)
+            await self._repo.update_profile(
+                user_id,
+                req.name,
+                req.avatar_url,
+                handle=req.handle,
+                bio=req.bio,
+                website_url=req.website_url,
+                social_links=req.social_links,
+                location=req.location,
+                cover_image_url=req.cover_image_url,
+                pronouns=req.pronouns,
+                tagline=req.tagline,
+            )
 
     async def self_upgrade_to_author(self, user_id: str) -> None:
         await self._repo.self_upgrade_role(user_id, UserRole.AUTHOR, UserRole.READER)
@@ -86,6 +104,11 @@ class UserService:
             "topics": topics,
             "email_notifs": row_get(row, "email_notifs", 1),
             "theme": row_get(row, "theme", "dark"),
+            "font_family": row_get(row, "font_family", "system"),
+            "font_size": row_get(row, "font_size", 18),
+            "content_width": row_get(row, "content_width", 720),
+            "line_height": row_get(row, "line_height", 1.6),
+            "code_theme": row_get(row, "code_theme", "github-dark"),
         }
 
     async def update_prefs(
@@ -94,9 +117,24 @@ class UserService:
         topics: list,
         email_notifs: int,
         theme: str,
+        font_family: str = "system",
+        font_size: int = 18,
+        content_width: int = 720,
+        line_height: float = 1.6,
+        code_theme: str = "github-dark",
     ) -> None:
         await self._repo.ensure_prefs(user_id)
-        await self._repo.update_prefs(user_id, json.dumps(topics), email_notifs, theme)
+        await self._repo.update_prefs(
+            user_id,
+            json.dumps(topics),
+            email_notifs,
+            theme,
+            font_family,
+            font_size,
+            content_width,
+            line_height,
+            code_theme,
+        )
 
     async def list_reading_history(
         self,

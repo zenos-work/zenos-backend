@@ -115,6 +115,8 @@ class AdminRepository(BaseRepository):
         article_id: Optional[str],
         comment_id: Optional[str],
         message: str,
+        channel: str = "in_app",
+        group_key: Optional[str] = None,
     ) -> None:
         actor_val = actor_id or ""
         article_val = article_id or ""
@@ -128,6 +130,8 @@ class AdminRepository(BaseRepository):
             article_val,
             comment_val,
             message,
+            channel or "",
+            group_key or "",
         )
 
     async def mark_notifications_read(self, user_id: str) -> None:

@@ -188,18 +188,24 @@ async def handle_social(request, env, path, method, query, ctx):
             return error(str(e), 404)
 
     # ── FOLLOWS ────────────────────────────────────
-    # POST /api/social/follows/:user_id — Follow a user
+    # POST /api/social/follows/:user_id — Follow a user (or tag/series via ?type=)
     if action == "follows" and target and method == "POST":
         try:
-            result = await svc.toggle_follow(uid, target, add=True)
+            following_type = query.get("type", ["user"])[0]
+            result = await svc.toggle_follow(
+                uid, target, add=True, following_type=following_type
+            )
             return json_resp({"action": result.to_dict()})
         except ValueError as e:
             return error(str(e), 409)
 
-    # DELETE /api/social/follows/:user_id — Unfollow a user
+    # DELETE /api/social/follows/:user_id — Unfollow a user (or tag/series via ?type=)
     if action == "follows" and target and method == "DELETE":
         try:
-            result = await svc.toggle_follow(uid, target, add=False)
+            following_type = query.get("type", ["user"])[0]
+            result = await svc.toggle_follow(
+                uid, target, add=False, following_type=following_type
+            )
             return json_resp({"action": result.to_dict()})
         except ValueError as e:
             return error(str(e), 409)
@@ -207,7 +213,10 @@ async def handle_social(request, env, path, method, query, ctx):
     # GET /api/social/follows/:user_id/check — Check if following
     if action == "follows" and target and subaction == "check" and method == "GET":
         try:
-            is_following = await svc.check_following(uid, target)
+            following_type = query.get("type", ["user"])[0]
+            is_following = await svc.check_following(
+                uid, target, following_type=following_type
+            )
             return json_resp({"is_following": is_following})
         except ValueError as e:
             return error(str(e), 404)

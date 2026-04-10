@@ -209,6 +209,11 @@ async def handle_users(request, env, path, method, query, ctx):
             topics=data.get("topics", []),
             email_notifs=data.get("email_notifs", 1),
             theme=data.get("theme", "dark"),
+            font_family=data.get("font_family", "system"),
+            font_size=int(data.get("font_size", 18)),
+            content_width=int(data.get("content_width", 720)),
+            line_height=float(data.get("line_height", 1.6)),
+            code_theme=data.get("code_theme", "github-dark"),
         )
         return json_resp({"status": "updated"})
 

@@ -173,6 +173,8 @@ class TestAdminRepository:
             "a1",
             "c1",
             "done",
+            "in_app",
+            "",
         )
         assert executed[1][0] == Q.UPDATE_MARK_NOTIFICATIONS_READ
         assert executed[1][1] == ("u1",)

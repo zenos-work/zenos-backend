@@ -50,24 +50,43 @@ SELECT_BOOKMARKS_BY_USER = (
 COUNT_BOOKMARKS = "SELECT COUNT(*) as count FROM bookmarks WHERE user_id = ?"
 
 # ── FOLLOWS ────────────────────────────────
-INSERT_FOLLOW = "INSERT INTO follows (follower_id, following_id) VALUES (?, ?)"
-DELETE_FOLLOW = "DELETE FROM follows WHERE follower_id = ? AND following_id = ?"
+INSERT_FOLLOW = (
+    "INSERT INTO follows (follower_id, following_id, following_type)"
+    " VALUES (?, ?, COALESCE(NULLIF(?, ''), 'user'))"
+)
+DELETE_FOLLOW = (
+    "DELETE FROM follows WHERE follower_id = ? AND following_id = ?"
+    " AND following_type = COALESCE(NULLIF(?, ''), 'user')"
+)
 SELECT_IF_FOLLOWING = (
-    "SELECT 1 FROM follows WHERE follower_id = ? AND following_id = ? LIMIT 1"
+    "SELECT 1 FROM follows WHERE follower_id = ? AND following_id = ?"
+    " AND following_type = COALESCE(NULLIF(?, ''), 'user') LIMIT 1"
 )
 SELECT_FOLLOWERS = (
     "SELECT u.* FROM users u"
     " JOIN follows f ON u.id = f.follower_id"
-    " WHERE f.following_id = ?"
+    " WHERE f.following_id = ? AND f.following_type = 'user'"
     " ORDER BY f.created_at DESC LIMIT ? OFFSET ?"
 )
-COUNT_FOLLOWERS = "SELECT COUNT(*) as count FROM follows WHERE following_id = ?"
+COUNT_FOLLOWERS = (
+    "SELECT COUNT(*) as count FROM follows"
+    " WHERE following_id = ? AND following_type = 'user'"
+)
 SELECT_FOLLOWING = (
     "SELECT u.* FROM users u"
     " JOIN follows f ON u.id = f.following_id"
-    " WHERE f.follower_id = ?"
+    " WHERE f.follower_id = ? AND f.following_type = 'user'"
     " ORDER BY f.created_at DESC LIMIT ? OFFSET ?"
 )
-COUNT_FOLLOWING = "SELECT COUNT(*) as count FROM follows WHERE follower_id = ?"
-SELECT_FOLLOWING_IDS = "SELECT following_id FROM follows WHERE follower_id = ?"
-SELECT_FOLLOWERS_COUNT = "SELECT COUNT(*) AS c FROM follows WHERE following_id = ?"
+COUNT_FOLLOWING = (
+    "SELECT COUNT(*) as count FROM follows"
+    " WHERE follower_id = ? AND following_type = 'user'"
+)
+SELECT_FOLLOWING_IDS = (
+    "SELECT following_id FROM follows"
+    " WHERE follower_id = ? AND following_type = 'user'"
+)
+SELECT_FOLLOWERS_COUNT = (
+    "SELECT COUNT(*) AS c FROM follows"
+    " WHERE following_id = ? AND following_type = 'user'"
+)

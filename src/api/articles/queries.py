@@ -208,3 +208,29 @@ SELECT_RELATED_ARTICLES = (
     "          a.published_at DESC"
     " LIMIT ?"
 )
+
+# ── Phase 3 Step 18: Security-level aware queries ──────────────────────────
+# Public-only feed: appends to published list queries
+SELECT_PUBLISHED_PUBLIC_ONLY = (
+    SELECT_BASE + " WHERE a.status = 'PUBLISHED' AND a.security_level = 'public'"
+    " ORDER BY a.published_at DESC LIMIT ? OFFSET ?"
+)
+
+# Org-member aware query: returns articles the user can see within an org
+SELECT_ORG_ARTICLES = (
+    SELECT_BASE + " WHERE a.org_id = ? AND a.status = 'PUBLISHED'"
+    " AND (a.security_level = 'public'"
+    "  OR (a.security_level = 'internal')"
+    "  OR (a.security_level = 'confidential'"
+    "      AND (a.author_id = ? OR EXISTS ("
+    "        SELECT 1 FROM org_members om"
+    "        WHERE om.org_id = a.org_id AND om.user_id = ?"
+    "        AND om.org_role IN ('owner','admin','editor'))))"
+    "  OR (a.security_level = 'restricted'"
+    "      AND EXISTS ("
+    "        SELECT 1 FROM org_members om"
+    "        WHERE om.org_id = a.org_id AND om.user_id = ?"
+    "        AND om.org_role IN ('owner','admin')))"
+    " )"
+    " ORDER BY a.published_at DESC LIMIT ? OFFSET ?"
+)
