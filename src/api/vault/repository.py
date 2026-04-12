@@ -27,11 +27,30 @@ class VaultRepository(BaseRepository):
         )
 
     async def create_secret(
-        self, sid, org_id, name, secret_type, created_by, metadata="{}"
+        self,
+        sid,
+        org_id,
+        name,
+        secret_type,
+        provider,
+        key_ref,
+        created_by,
+        metadata="{}",
     ):
         await self.execute(
-            Q.INSERT_SECRET, sid, org_id, name, secret_type, created_by, metadata
+            Q.INSERT_SECRET,
+            sid,
+            org_id,
+            name,
+            secret_type,
+            provider,
+            key_ref,
+            created_by,
+            metadata,
         )
+
+    async def update_secret_provider_ref(self, secret_id, provider, key_ref):
+        await self.execute(Q.UPDATE_SECRET_PROVIDER_REF, provider, key_ref, secret_id)
 
     async def mark_rotated(self, secret_id):
         await self.execute(Q.UPDATE_SECRET_ROTATED, secret_id)
@@ -41,6 +60,18 @@ class VaultRepository(BaseRepository):
 
     async def delete(self, secret_id):
         await self.execute(Q.DELETE_SECRET, secret_id)
+
+    async def upsert_fallback_payload(self, secret_id, cipher_text):
+        await self.execute(Q.UPSERT_FALLBACK_PAYLOAD, secret_id, cipher_text)
+
+    async def get_fallback_payload(self, secret_id):
+        row = await self.find_one(Q.GET_FALLBACK_PAYLOAD, secret_id)
+        if not row:
+            return ""
+        return row.get("cipher_text", "") or ""
+
+    async def delete_fallback_payload(self, secret_id):
+        await self.execute(Q.DELETE_FALLBACK_PAYLOAD, secret_id)
 
     # ── Write quota ──────────────────────────────────────────
     async def get_write_quota(self, org_id):

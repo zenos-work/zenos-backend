@@ -45,6 +45,9 @@ DELETE_WORKFLOW = "DELETE FROM workflows WHERE id = ?"
 UPDATE_WORKFLOW_STATUS = """
     UPDATE workflows SET status=?, updated_at=datetime('now') WHERE id = ?
 """
+UPDATE_WORKFLOW_DEFINITION_VERSION = """
+    UPDATE workflows SET definition_version=?, updated_at=datetime('now') WHERE id = ?
+"""
 UPDATE_WORKFLOW_RUN_STATS = """
     UPDATE workflows SET total_runs = total_runs + 1,
         last_run_at = datetime('now'), last_run_status = ?,
@@ -87,6 +90,9 @@ GET_VERSIONS_BY_WORKFLOW = """
     ORDER BY version_number DESC
 """
 GET_VERSION_BY_ID = "SELECT * FROM workflow_versions WHERE id = ?"
+GET_VERSION_BY_WORKFLOW_AND_NUMBER = (
+    "SELECT * FROM workflow_versions WHERE workflow_id = ? AND version_number = ?"
+)
 GET_LATEST_VERSION = """
     SELECT * FROM workflow_versions WHERE workflow_id = ?
     ORDER BY version_number DESC LIMIT 1

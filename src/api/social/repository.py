@@ -156,3 +156,42 @@ class SocialRepository(BaseRepository):
         """Count users that a user is following."""
         row = await self.find_one(Q.COUNT_FOLLOWING, user_id)
         return row_get(row, "count", 0) if row else 0
+
+    # ── CONNECTED SOCIAL ACCOUNTS (SR-024) ─────────────────
+    async def list_social_accounts(self, user_id: str) -> list:
+        rows = await self.find_all(Q.SELECT_SOCIAL_ACCOUNTS, user_id)
+        return [dict(r) for r in rows] if rows else []
+
+    async def upsert_social_account(
+        self,
+        account_id: str,
+        user_id: str,
+        provider: str,
+        provider_uid: str,
+        handle: str,
+        display_name: str,
+        access_token: str,
+        refresh_token: str,
+        token_expires_at,
+        scopes: str,
+    ) -> None:
+        await self.execute(
+            Q.UPSERT_SOCIAL_ACCOUNT,
+            account_id,
+            user_id,
+            provider,
+            provider_uid,
+            handle,
+            display_name,
+            access_token,
+            refresh_token,
+            token_expires_at,
+            scopes,
+        )
+
+    async def delete_social_account(self, user_id: str, provider: str) -> None:
+        await self.execute(Q.DELETE_SOCIAL_ACCOUNT, user_id, provider)
+
+    async def get_social_account(self, user_id: str, provider: str) -> dict | None:
+        row = await self.find_one(Q.SELECT_SOCIAL_ACCOUNT, user_id, provider)
+        return dict(row) if row else None

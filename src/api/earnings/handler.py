@@ -2,6 +2,21 @@ from utils.helpers import json_resp, error
 from middleware.auth import get_user
 from middleware.auth import require_role
 from api.earnings.service import EarningsService
+from api.feature_flags.service import FeatureFlagService
+
+
+async def _is_feature_enabled(env, ctx, user, flag_key: str) -> bool:
+    if getattr(env, "DB", None) is None:
+        return True
+    try:
+        svc = FeatureFlagService(env, ctx)
+        return await svc.evaluate_one(
+            flag_key,
+            user_id=user.get("sub"),
+            user_role=user.get("role", ""),
+        )
+    except Exception:
+        return False
 
 
 async def handle_earnings(request, env, path, method, query, ctx):
@@ -71,6 +86,8 @@ async def handle_earnings(request, env, path, method, query, ctx):
     if path.rstrip("/") == "/api/admin/earnings/calculate" and method == "POST":
         if not require_role(user, ("SUPERADMIN",)):
             return error("Forbidden", 403)
+        if not await _is_feature_enabled(env, ctx, user, "admin_earnings"):
+            return error("Feature 'admin_earnings' is disabled", 403)
         body = await request.json()
         data = body if isinstance(body, dict) else {}
         try:
@@ -89,6 +106,8 @@ async def handle_earnings(request, env, path, method, query, ctx):
     if path.startswith("/api/admin/earnings/period/") and method == "GET":
         if not require_role(user, ("SUPERADMIN",)):
             return error("Forbidden", 403)
+        if not await _is_feature_enabled(env, ctx, user, "admin_earnings"):
+            return error("Feature 'admin_earnings' is disabled", 403)
         period_start = parts[5] if len(parts) > 5 else ""
         return json_resp(await svc.distribution_report(period_start))
 

@@ -290,6 +290,37 @@ async def handle_workflows(request, env, path, method, query, ctx):
             except ValueError as e:
                 return error(str(e), 400)
 
+        # POST /api/workflows/:id/versions/:version_number/restore
+        if method == "POST" and len(parts) == 7 and parts[6] == "restore":
+            try:
+                version_number = int(parts[5])
+            except Exception:
+                return error("Invalid version number", 400)
+            try:
+                result = await svc.restore_version(
+                    wf_id,
+                    restored_by=uid,
+                    version_number=version_number,
+                )
+                return json_resp(result)
+            except ValueError as e:
+                return error(str(e), 400)
+
+    # POST /api/workflows/:id/restore
+    if len(parts) == 5 and parts[4] == "restore" and method == "POST":
+        body = await request.json()
+        data = body if isinstance(body, dict) else {}
+        try:
+            result = await svc.restore_version(
+                wf_id,
+                restored_by=uid,
+                version_id=data.get("version_id", ""),
+                version_number=int(data.get("version_number", 0) or 0),
+            )
+            return json_resp(result)
+        except ValueError as e:
+            return error(str(e), 400)
+
     # ── Webhooks ──────────────────────────────────────────────
     if len(parts) >= 5 and parts[4] == "webhooks":
         # GET /api/workflows/:id/webhooks

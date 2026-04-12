@@ -8,8 +8,12 @@ GET_SECRET = "SELECT * FROM vault_secrets WHERE id = ? AND org_id = ?"
 GET_SECRET_BY_NAME = "SELECT * FROM vault_secrets WHERE org_id = ? AND name = ?"
 
 INSERT_SECRET = """INSERT INTO vault_secrets
-    (id, org_id, name, secret_type, is_active, created_by, metadata)
-    VALUES (?, ?, ?, ?, 1, ?, ?)"""
+    (id, org_id, name, secret_type, provider, key_ref, is_active, created_by, metadata)
+    VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)"""
+
+UPDATE_SECRET_PROVIDER_REF = """UPDATE vault_secrets
+    SET provider = ?, key_ref = ?, updated_at = datetime('now')
+    WHERE id = ?"""
 
 UPDATE_SECRET_ROTATED = """UPDATE vault_secrets
     SET last_rotated_at = datetime('now'), updated_at = datetime('now')
@@ -20,6 +24,18 @@ DEACTIVATE_SECRET = """UPDATE vault_secrets
     WHERE id = ?"""
 
 DELETE_SECRET = "DELETE FROM vault_secrets WHERE id = ?"
+
+UPSERT_FALLBACK_PAYLOAD = """INSERT INTO vault_secret_payloads (secret_id, cipher_text)
+        VALUES (?, ?)
+        ON CONFLICT(secret_id) DO UPDATE SET
+            cipher_text = excluded.cipher_text,
+            updated_at = datetime('now')"""
+
+GET_FALLBACK_PAYLOAD = (
+    "SELECT cipher_text FROM vault_secret_payloads WHERE secret_id = ?"
+)
+
+DELETE_FALLBACK_PAYLOAD = "DELETE FROM vault_secret_payloads WHERE secret_id = ?"
 
 # ── Write quota tracking ─────────────────────────────────────
 GET_WRITE_QUOTA = (

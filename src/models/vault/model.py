@@ -9,6 +9,8 @@ class VaultSecret:
     org_id: str = ""
     name: str = ""
     secret_type: str = "generic"  # generic, oauth_token, api_key, webhook_secret
+    provider: str = "cloudflare"
+    key_ref: str = ""
     is_active: bool = True
     last_rotated_at: str = ""
     expires_at: str = ""
@@ -26,6 +28,8 @@ class VaultSecret:
             org_id=row.get("org_id", ""),
             name=row.get("name", ""),
             secret_type=row.get("secret_type", "generic") or "generic",
+            provider=row.get("provider", "cloudflare") or "cloudflare",
+            key_ref=row.get("key_ref", "") or "",
             is_active=bool(row.get("is_active", 1)),
             last_rotated_at=row.get("last_rotated_at", "") or "",
             expires_at=row.get("expires_at", "") or "",
@@ -41,6 +45,8 @@ class VaultSecret:
             "org_id": self.org_id,
             "name": self.name,
             "secret_type": self.secret_type,
+            "provider": self.provider,
+            "key_ref": self.key_ref,
             "is_active": self.is_active,
             "last_rotated_at": self.last_rotated_at,
             "expires_at": self.expires_at,

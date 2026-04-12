@@ -155,6 +155,11 @@ class WorkflowRepository(BaseRepository):
     async def update_workflow_status(self, wid, status):
         await self.execute(Q.UPDATE_WORKFLOW_STATUS, [status, wid])
 
+    async def update_workflow_definition_version(self, wid, definition_version):
+        await self.execute(
+            Q.UPDATE_WORKFLOW_DEFINITION_VERSION, [definition_version, wid]
+        )
+
     async def update_run_stats(self, wid, status):
         await self.execute(Q.UPDATE_WORKFLOW_RUN_STATS, [status, status, status, wid])
 
@@ -221,6 +226,13 @@ class WorkflowRepository(BaseRepository):
 
     async def get_version(self, vid):
         return await self._one(WorkflowVersion, Q.GET_VERSION_BY_ID, [vid])
+
+    async def get_version_by_number(self, workflow_id, version_number):
+        return await self._one(
+            WorkflowVersion,
+            Q.GET_VERSION_BY_WORKFLOW_AND_NUMBER,
+            [workflow_id, version_number],
+        )
 
     async def get_latest_version(self, workflow_id):
         return await self._one(WorkflowVersion, Q.GET_LATEST_VERSION, [workflow_id])

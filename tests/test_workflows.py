@@ -396,6 +396,20 @@ class FakeWorkflowService:
             raise ValueError("Workflow not found")
         return {"id": "new-ver-id", "version_number": 2}
 
+    async def restore_version(
+        self,
+        workflow_id,
+        restored_by,
+        version_id="",
+        version_number=0,
+    ):
+        self.calls.append(("restore_version", workflow_id, version_id, version_number))
+        if workflow_id == "missing":
+            raise ValueError("Workflow not found")
+        if (version_number or 0) <= 0 and not version_id:
+            raise ValueError("Workflow version not found")
+        return {"workflow_id": workflow_id, "restored_version": version_number or 1}
+
     async def create_webhook(self, workflow_id, node_id=None, method="POST"):
         self.calls.append(("create_webhook", workflow_id))
         return {"id": "wh1", "token": "secret-token"}
@@ -883,6 +897,49 @@ class TestWorkflowCoreHandler:
         )
         assert resp.status_code == 201
         assert resp.json()["version_number"] == 2
+
+    def test_restore_version_by_number(self, client, svc):
+        resp = client.post(
+            "/api/workflows/w1/versions/2/restore",
+            headers={"Authorization": f"Bearer {_token()}"},
+            json_body={},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["restored_version"] == 2
+
+    def test_restore_version_by_body(self, client, svc):
+        resp = client.post(
+            "/api/workflows/w1/restore",
+            headers={"Authorization": f"Bearer {_token()}"},
+            json_body={"version_number": 1},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["workflow_id"] == "w1"
+
+    def test_restore_version_with_invalid_version_number_path(self, client, svc):
+        resp = client.post(
+            "/api/workflows/w1/versions/not-a-number/restore",
+            headers={"Authorization": f"Bearer {_token()}"},
+            json_body={},
+        )
+        assert resp.status_code == 400
+        assert resp.json()["error"]["message"] == "Invalid version number"
+
+    def test_restore_version_with_missing_version_selector(self, client, svc):
+        resp = client.post(
+            "/api/workflows/w1/restore",
+            headers={"Authorization": f"Bearer {_token()}"},
+            json_body={},
+        )
+        assert resp.status_code == 400
+
+    def test_restore_version_requires_auth_on_number_route(self, client, svc):
+        resp = client.post("/api/workflows/w1/versions/1/restore", json_body={})
+        assert resp.status_code == 401
+
+    def test_restore_version_requires_auth_on_body_route(self, client, svc):
+        resp = client.post("/api/workflows/w1/restore", json_body={"version_number": 1})
+        assert resp.status_code == 401
 
     def test_list_webhooks(self, client, svc):
         resp = client.get(

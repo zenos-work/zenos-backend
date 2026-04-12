@@ -3,6 +3,21 @@
 from utils.helpers import json_resp, error
 from middleware.auth import get_user
 from api.podcasts.service import PodcastService
+from api.feature_flags.service import FeatureFlagService
+
+
+async def _is_feature_enabled(env, ctx, user, flag_key: str) -> bool:
+    if getattr(env, "DB", None) is None:
+        return True
+    try:
+        svc = FeatureFlagService(env, ctx)
+        return await svc.evaluate_one(
+            flag_key,
+            user_id=user.get("sub"),
+            user_role=user.get("role", ""),
+        )
+    except Exception:
+        return False
 
 
 async def handle_podcasts(request, env, path, method, query, ctx):
@@ -13,6 +28,9 @@ async def handle_podcasts(request, env, path, method, query, ctx):
     if not user:
         return error("Unauthorised", 401)
     uid = user["sub"]
+
+    if not await _is_feature_enabled(env, ctx, user, "podcasts"):
+        return error("Feature 'podcasts' is disabled", 403)
 
     # ── Episodes sub-resource ────────────────────────────────
     # /api/podcasts/:sid/episodes[/:eid]

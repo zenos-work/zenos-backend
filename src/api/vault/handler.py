@@ -29,6 +29,9 @@ async def handle_vault(request, env, path, method, query, ctx):
                 secret_type=data.get("secret_type", "generic"),
                 created_by=uid,
                 metadata=data.get("metadata", "{}"),
+                provider=data.get("provider", "cloudflare"),
+                key_ref=data.get("key_ref", ""),
+                secret_value=data.get("secret_value", ""),
             )
             return json_resp(result, 201)
         except ValueError as e:
@@ -53,8 +56,14 @@ async def handle_vault(request, env, path, method, query, ctx):
     # ── POST .../secrets/:name/rotate ─────────────────────────
     if method == "POST" and len(parts) == 8 and parts[7] == "rotate":
         name = parts[6]
+        body = await request.json()
+        data = body if isinstance(body, dict) else {}
         try:
-            result = await svc.rotate_secret(org_id, name)
+            result = await svc.rotate_secret(
+                org_id,
+                name,
+                secret_value=data.get("secret_value", ""),
+            )
             return json_resp(result)
         except ValueError as e:
             return error(str(e), 404)

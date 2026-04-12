@@ -438,13 +438,29 @@ class FakeVaultService:
     def __init__(self, env, ctx=None):
         self.calls = []
 
-    async def store_secret(self, org_id, name, secret_type, created_by, metadata="{}"):
+    async def store_secret(
+        self,
+        org_id,
+        name,
+        secret_type,
+        created_by,
+        metadata="{}",
+        provider="cloudflare",
+        key_ref="",
+        secret_value="",
+    ):
         self.calls.append(("store_secret", org_id, name))
         if not name:
             raise ValueError("name required")
         if name == "quota-hit":
             raise PermissionError("quota")
-        return {"id": "sec1", "name": name, "secret_type": secret_type}
+        return {
+            "id": "sec1",
+            "name": name,
+            "secret_type": secret_type,
+            "provider": provider,
+            "key_ref": key_ref,
+        }
 
     async def list_secrets(self, org_id):
         self.calls.append(("list_secrets", org_id))
@@ -456,7 +472,7 @@ class FakeVaultService:
             raise ValueError("not found")
         return {"id": secret_id, "revoked": True}
 
-    async def rotate_secret(self, org_id, name):
+    async def rotate_secret(self, org_id, name, secret_value=""):
         self.calls.append(("rotate_secret", org_id, name))
         if name == "missing":
             raise ValueError("not found")

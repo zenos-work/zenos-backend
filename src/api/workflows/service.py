@@ -384,6 +384,121 @@ class WorkflowService:
         )
         return {"id": vid, "version_number": ver}
 
+    async def restore_version(
+        self,
+        workflow_id: str,
+        restored_by: str,
+        version_id: str = "",
+        version_number: int = 0,
+    ) -> dict:
+        wf = await self._repo.find_workflow(workflow_id)
+        if not wf:
+            raise ValueError("Workflow not found")
+
+        version = None
+        if version_id:
+            version = await self._repo.get_version(version_id)
+        elif version_number > 0:
+            version = await self._repo.get_version_by_number(
+                workflow_id, version_number
+            )
+        if not version or version.workflow_id != workflow_id:
+            raise ValueError("Workflow version not found")
+
+        definition = version.definition or {}
+        nodes = definition.get("nodes", []) if isinstance(definition, dict) else []
+        edges = definition.get("edges", []) if isinstance(definition, dict) else []
+
+        # Rebuild graph from selected version snapshot.
+        existing_edges = await self._repo.get_edges(workflow_id)
+        for edge in existing_edges:
+            await self._repo.delete_edge(edge.id)
+
+        existing_nodes = await self._repo.get_nodes(workflow_id)
+        for node in existing_nodes:
+            await self._repo.delete_node(node.id)
+
+        for node in nodes:
+            node_data = node if isinstance(node, dict) else {}
+            node_id = str(node_data.get("id") or new_id())
+            node_type_id = (
+                node_data.get("node_type_id")
+                or node_data.get("type")
+                or (
+                    node_data.get("data", {})
+                    if isinstance(node_data.get("data"), dict)
+                    else {}
+                ).get("node_type")
+                or "trigger.manual"
+            )
+            label = (
+                node_data.get("label")
+                or (
+                    node_data.get("data", {})
+                    if isinstance(node_data.get("data"), dict)
+                    else {}
+                ).get("label")
+                or ""
+            )
+            px = node_data.get("position_x")
+            py = node_data.get("position_y")
+            if px is None or py is None:
+                position = (
+                    node_data.get("position")
+                    if isinstance(node_data.get("position"), dict)
+                    else {}
+                )
+                px = position.get("x", 0)
+                py = position.get("y", 0)
+
+            display_config = node_data.get("display_config")
+            if not isinstance(display_config, dict):
+                display_config = (
+                    node_data.get("data")
+                    if isinstance(node_data.get("data"), dict)
+                    else {}
+                )
+
+            await self._repo.create_node(
+                node_id,
+                workflow_id,
+                str(node_type_id),
+                str(label),
+                float(px or 0),
+                float(py or 0),
+                json.dumps(display_config),
+                node_data.get("connector_binding_id"),
+            )
+
+        for edge in edges:
+            edge_data = edge if isinstance(edge, dict) else {}
+            source = edge_data.get("source_node_id") or edge_data.get("source")
+            target = edge_data.get("target_node_id") or edge_data.get("target")
+            if not source or not target:
+                continue
+            await self._repo.create_edge(
+                str(edge_data.get("id") or new_id()),
+                workflow_id,
+                str(source),
+                str(target),
+                str(edge_data.get("condition_label") or edge_data.get("label") or ""),
+            )
+
+        await self._repo.update_workflow_definition_version(
+            workflow_id, version.version_number
+        )
+        await self._audit(
+            wf.org_id,
+            workflow_id,
+            None,
+            restored_by,
+            "workflow.version_restored",
+            "workflow_version",
+            version.id,
+            detail={"version_number": version.version_number},
+        )
+        return {"workflow_id": workflow_id, "restored_version": version.version_number}
+
     # ── Webhooks ──────────────────────────────────────────────
 
     async def create_webhook(

@@ -3,6 +3,21 @@
 from utils.helpers import json_resp, error
 from middleware.auth import get_user
 from api.workflow_costs.service import WorkflowCostService
+from api.feature_flags.service import FeatureFlagService
+
+
+async def _is_feature_enabled(env, ctx, user, flag_key: str) -> bool:
+    if getattr(env, "DB", None) is None:
+        return True
+    try:
+        svc = FeatureFlagService(env, ctx)
+        return await svc.evaluate_one(
+            flag_key,
+            user_id=user.get("sub"),
+            user_role=user.get("role", ""),
+        )
+    except Exception:
+        return False
 
 
 async def handle_workflow_costs(request, env, path, method, query, ctx):
@@ -12,6 +27,9 @@ async def handle_workflow_costs(request, env, path, method, query, ctx):
     user = await get_user(request, env)
     if not user:
         return error("Unauthorised", 401)
+
+    if not await _is_feature_enabled(env, ctx, user, "workflow_costs"):
+        return error("Feature 'workflow_costs' is disabled", 403)
 
     # /api/workflow-costs/rates[/:rid]
     if len(parts) >= 4 and parts[3] == "rates":

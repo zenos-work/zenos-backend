@@ -61,6 +61,14 @@ create_token = importlib.import_module("auth.jwt_handler").create_token
 _JWT_SECRET = "test-secret"
 
 
+class _FeatureFlagOn:
+    def __init__(self, *_args, **_kwargs):
+        pass
+
+    async def evaluate_one(self, *_args, **_kwargs):
+        return True
+
+
 class TestDistributionAlgorithm:
     def test_distribution_splits_by_read_time(self):
         reads = [
@@ -201,7 +209,9 @@ def _make_client(fake_svc):
                 JWT_SECRET = _JWT_SECRET
 
             orig = earnings_handler.EarningsService
+            orig_flags = earnings_handler.FeatureFlagService
             earnings_handler.EarningsService = lambda env, ctx=None: self.svc
+            earnings_handler.FeatureFlagService = _FeatureFlagOn
             try:
                 return asyncio.run(
                     earnings_handler.handle_earnings(
@@ -215,6 +225,7 @@ def _make_client(fake_svc):
                 )
             finally:
                 earnings_handler.EarningsService = orig
+                earnings_handler.FeatureFlagService = orig_flags
 
         def get(self, path, headers=None):
             return self._dispatch("GET", path, headers=headers)
@@ -328,8 +339,10 @@ def _make_billing_client():
 
             orig_webhook = billing_handler.StripeWebhookHandler
             orig_recon = billing_handler.BillingReconciliation
+            orig_flags = billing_handler.FeatureFlagService
             billing_handler.StripeWebhookHandler = FakeStripeWebhookHandler
             billing_handler.BillingReconciliation = FakeBillingReconciliation
+            billing_handler.FeatureFlagService = _FeatureFlagOn
             try:
                 return asyncio.run(
                     billing_handler.handle_billing(
@@ -344,6 +357,7 @@ def _make_billing_client():
             finally:
                 billing_handler.StripeWebhookHandler = orig_webhook
                 billing_handler.BillingReconciliation = orig_recon
+                billing_handler.FeatureFlagService = orig_flags
 
         def get(self, path, headers=None):
             return self._dispatch("GET", path, headers=headers)
@@ -497,8 +511,10 @@ def _make_compliance_client():
 
             orig_export = compliance_handler.ExportService
             orig_erasure = compliance_handler.ErasureService
+            orig_flags = compliance_handler.FeatureFlagService
             compliance_handler.ExportService = FakeExportService
             compliance_handler.ErasureService = FakeErasureService
+            compliance_handler.FeatureFlagService = _FeatureFlagOn
             try:
                 return asyncio.run(
                     compliance_handler.handle_compliance(
@@ -513,6 +529,7 @@ def _make_compliance_client():
             finally:
                 compliance_handler.ExportService = orig_export
                 compliance_handler.ErasureService = orig_erasure
+                compliance_handler.FeatureFlagService = orig_flags
 
         def get(self, path, headers=None):
             return self._dispatch("GET", path, headers=headers)

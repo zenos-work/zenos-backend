@@ -168,6 +168,45 @@ class _Repo:
         self.calls.append(("count_following", user_id))
         return self.following_count
 
+    # SR-024 stubs
+    async def list_social_accounts(self, user_id):
+        self.calls.append(("list_social_accounts", user_id))
+        return [
+            {
+                "id": "acct-1",
+                "provider": "linkedin",
+                "provider_uid": "uid-123",
+                "handle": "@alice",
+                "display_name": "Alice",
+                "scopes": '["r_liteprofile"]',
+                "connected_at": "2026-01-01T00:00:00Z",
+                "last_used_at": None,
+                "is_active": 1,
+            }
+        ]
+
+    async def upsert_social_account(
+        self,
+        account_id,
+        user_id,
+        provider,
+        provider_uid,
+        handle,
+        display_name,
+        access_token,
+        refresh_token,
+        token_expires_at,
+        scopes,
+    ):
+        self.calls.append(("upsert_social_account", user_id, provider))
+
+    async def delete_social_account(self, user_id, provider):
+        self.calls.append(("delete_social_account", user_id, provider))
+
+    async def get_social_account(self, user_id, provider):
+        self.calls.append(("get_social_account", user_id, provider))
+        return None
+
 
 class _ArticleRepo:
     def __init__(self):
@@ -387,3 +426,78 @@ class TestSocialService:
             "followers_count": 10,
             "following_count": 7,
         }
+
+    # ── SR-024: Connected Social Account Service Tests ──────────
+    @pytest.mark.asyncio
+    async def test_list_connected_accounts_returns_sanitised_list(self, service):
+        accounts = await service.list_connected_accounts("u1")
+        assert len(accounts) == 1
+        account = accounts[0]
+        assert account["provider"] == "linkedin"
+        assert account["handle"] == "@alice"
+        assert account["scopes"] == ["r_liteprofile"]
+        assert account["is_active"] is True
+        assert ("list_social_accounts", "u1") in service._repo.calls
+
+    @pytest.mark.asyncio
+    async def test_connect_social_account_valid_provider(self, service):
+        result = await service.connect_social_account(
+            user_id="u1",
+            provider="linkedin",
+            provider_uid="uid-456",
+            handle="@alice",
+            display_name="Alice",
+            access_token="tok",
+            refresh_token="rtok",
+            token_expires_at=9_999_999,
+            scopes=["r_liteprofile"],
+        )
+        assert result["provider"] == "linkedin"
+        assert result["connected"] is True
+        assert any(c[0] == "upsert_social_account" for c in service._repo.calls)
+
+    @pytest.mark.asyncio
+    async def test_connect_social_account_unsupported_provider_raises(self, service):
+        with pytest.raises(ValueError, match="Unsupported provider"):
+            await service.connect_social_account(
+                user_id="u1",
+                provider="tiktok",
+                provider_uid="uid-x",
+            )
+
+    @pytest.mark.asyncio
+    async def test_disconnect_social_account_valid_provider(self, service):
+        await service.disconnect_social_account("u1", "x")
+        assert ("delete_social_account", "u1", "x") in service._repo.calls
+
+    @pytest.mark.asyncio
+    async def test_disconnect_social_account_unsupported_raises(self, service):
+        with pytest.raises(ValueError, match="Unsupported provider"):
+            await service.disconnect_social_account("u1", "badprovider")
+
+    @pytest.mark.asyncio
+    async def test_get_share_url_linkedin(self, service):
+        url = await service.get_share_url(
+            "linkedin", "https://zenos.work/a/test", "Hello World"
+        )
+        assert "linkedin.com" in url
+        assert "zenos.work" in url
+
+    @pytest.mark.asyncio
+    async def test_get_share_url_x(self, service):
+        url = await service.get_share_url("x", "https://zenos.work/a/test", "Hello")
+        assert "twitter.com" in url
+
+    @pytest.mark.asyncio
+    async def test_get_share_url_facebook(self, service):
+        url = await service.get_share_url(
+            "facebook", "https://zenos.work/a/test", "Hello"
+        )
+        assert "facebook.com" in url
+
+    @pytest.mark.asyncio
+    async def test_get_share_url_unsupported_raises(self, service):
+        with pytest.raises(ValueError, match="Share URL not available"):
+            await service.get_share_url(
+                "mastodon", "https://zenos.work/a/test", "Hello"
+            )

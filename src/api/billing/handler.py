@@ -4,6 +4,21 @@ from utils.helpers import json_resp, error
 from middleware.auth import get_user, require_role
 from api.billing.webhook_handler import StripeWebhookHandler
 from api.billing.reconciliation import BillingReconciliation
+from api.feature_flags.service import FeatureFlagService
+
+
+async def _is_feature_enabled(env, ctx, user, flag_key: str) -> bool:
+    if getattr(env, "DB", None) is None:
+        return True
+    try:
+        svc = FeatureFlagService(env, ctx)
+        return await svc.evaluate_one(
+            flag_key,
+            user_id=user.get("sub"),
+            user_role=user.get("role", ""),
+        )
+    except Exception:
+        return False
 
 
 async def handle_billing(request, env, path, method, query, ctx):
@@ -30,6 +45,9 @@ async def handle_billing(request, env, path, method, query, ctx):
 
     if not require_role(user, ("SUPERADMIN",)):
         return error("Forbidden", 403)
+
+    if not await _is_feature_enabled(env, ctx, user, "admin_billing"):
+        return error("Feature 'admin_billing' is disabled", 403)
 
     # GET /api/admin/billing/reconciliation/:period
     if path.startswith("/api/admin/billing/reconciliation/") and method == "GET":
