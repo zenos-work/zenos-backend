@@ -28,69 +28,48 @@ class D1Executor:
         self._db = db
         self._ctx = ctx
 
-    def _null_value(self):
-        # D1 reliably binds Python None to SQL NULL in this runtime.
-        # Returning JS proxy null here can surface as unsupported undefined.
-        return None
-
-    @staticmethod
-    def _is_null_like_string(value: str) -> bool:
-        lowered = value.strip().lower()
-        return lowered in {
-            "undefined",
-            "null",
-            "[object undefined]",
-            "[object null]",
-        }
-
     def _normalize_param(self, value: Any) -> Any:
-        if value is None:
-            return self._null_value()
-
-        # Fast-path for JS undefined/null objects exposed by Python Workers.
-        # These may not be Python strings, but their string representation is
-        # often "undefined"/"null" and D1 bind rejects them.
-        try:
-            rendered = str(value).strip().lower()
-            if self._is_null_like_string(rendered):
-                return self._null_value()
-        except Exception:
-            pass
-
-        # In Python Workers, optional fields may arrive as JS `undefined` proxies.
-        to_py = getattr(value, "to_py", None)
-        if callable(to_py):
+        # Check for Pyodide JsProxy objects. These can sometimes wrap 'undefined'
+        # which D1 rejects. We check string representation as a heuristic.
+        proxy_type = type(value).__name__
+        if "JsProxy" in proxy_type or "JsObject" in proxy_type:
             try:
-                value = to_py()
-            except TypeError:
-                value = to_py(depth=5)
+                rendered = str(value).strip()
+                if rendered in (
+                    "undefined",
+                    "null",
+                    "[object Undefined]",
+                    "[object Null]",
+                ):
+                    return None
+                # Try to convert proxy back to Python primitive if possible
+                to_py = getattr(value, "to_py", None)
+                if callable(to_py):
+                    try:
+                        value = to_py()
+                    except (TypeError, ValueError):
+                        value = to_py(depth=2)
+            except Exception:
+                return None
 
         if value is None:
-            return self._null_value()
+            return None
 
+        # Handle strings that look like JS nulls
         if isinstance(value, str):
-            if self._is_null_like_string(value):
-                return self._null_value()
-
-        try:
-            rendered = str(value).strip().lower()
-            if self._is_null_like_string(rendered):
-                return self._null_value()
-        except Exception:
-            pass
+            lowered = value.strip().lower()
+            if lowered in ("undefined", "null", "[object undefined]", "[object null]"):
+                return None
 
         primitive_types = (str, int, float, bool, bytes, bytearray, memoryview)
         if isinstance(value, primitive_types):
             return value
 
-        # Last-resort guard: prevent JS proxy-like objects from reaching D1 bind.
+        # Last-resort fallback: attempt string conversion or return None
         try:
-            rendered = str(value).strip().lower()
-            if self._is_null_like_string(rendered):
-                return self._null_value()
             return str(value)
         except Exception:
-            return self._null_value()
+            return None
 
     def _normalize_params(self, params: tuple) -> tuple:
         return tuple(self._normalize_param(p) for p in params)

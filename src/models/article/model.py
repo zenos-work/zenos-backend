@@ -180,6 +180,7 @@ class Article(BaseModel):
             approved_by=row_get(row, "approved_by"),
             author_name=row_get(row, "author_name"),
             author_avatar=row_get(row, "author_avatar"),
+            reading_level=row_get(row, "reading_level"),
             premium_only=row_get(row, "premium_only", 0),
             premium_teaser_words=row_get(row, "premium_teaser_words", 300),
             org_id=row_get(row, "org_id"),

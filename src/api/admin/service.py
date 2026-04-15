@@ -123,6 +123,15 @@ class AdminService:
             raise ValueError("notification_id is required")
         await self._repo.mark_notification_read(user_id, target)
 
+    async def delete_notification(self, user_id: str, notification_id: str) -> None:
+        target = str(notification_id or "").strip()
+        if not target:
+            raise ValueError("notification_id is required")
+        await self._repo.delete_notification(user_id, target)
+
+    async def delete_all_notifications(self, user_id: str) -> None:
+        await self._repo.delete_all_notifications(user_id)
+
     async def create_notification(
         self,
         user_id: str,

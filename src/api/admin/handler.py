@@ -276,8 +276,23 @@ async def handle_admin(request, env, path, method, query, ctx):
     # PUT /api/admin/notifications/:id/read
     if method == "PUT" and section == "notifications" and target and action == "read":
         try:
-            await svc.mark_notification_read(user["sub"], target)
+            await svc.mark_notification_read(
+                user_id=user["sub"], notification_id=target
+            )
             return json_resp({"status": "marked read"})
+        except ValueError as e:
+            return error(str(e), 422)
+
+    # DELETE /api/admin/notifications/all
+    if method == "DELETE" and section == "notifications" and target == "all":
+        await svc.delete_all_notifications(user["sub"])
+        return json_resp({"status": "deleted all"})
+
+    # DELETE /api/admin/notifications/:id
+    if method == "DELETE" and section == "notifications" and target and not action:
+        try:
+            await svc.delete_notification(user_id=user["sub"], notification_id=target)
+            return json_resp({"status": "deleted"})
         except ValueError as e:
             return error(str(e), 422)
 

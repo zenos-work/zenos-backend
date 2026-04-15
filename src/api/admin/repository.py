@@ -142,6 +142,12 @@ class AdminRepository(BaseRepository):
             Q.UPDATE_MARK_NOTIFICATION_READ_BY_ID, user_id, notification_id
         )
 
+    async def delete_notification(self, user_id: str, notification_id: str) -> None:
+        await self.execute(Q.DELETE_NOTIFICATION, user_id, notification_id)
+
+    async def delete_all_notifications(self, user_id: str) -> None:
+        await self.execute(Q.DELETE_ALL_NOTIFICATIONS, user_id)
+
     async def list_content_types(self) -> list[dict]:
         rows = await self.find_all(Q.SELECT_CONTENT_TYPES_ADMIN)
         return [

@@ -62,7 +62,13 @@ async def handle_users(request, env, path, method, query, ctx):
             targets = list(approver_ids)
 
         if not targets:
-            return error("No approver recipients found", 422)
+            # Fallback for development/testing: if no approvers exist, include the sender
+            # so the workflow doesn't block.
+            is_dev = env.get("ENVIRONMENT") == "development"
+            if is_dev and user.get("sub"):
+                targets = [user["sub"]]
+            else:
+                return error("No approver recipients found", 422)
 
         for target_id in targets:
             await admin_svc.create_notification(
