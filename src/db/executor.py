@@ -4,7 +4,7 @@ from typing import Optional, Any
 try:
     import js
 
-    js_null = js.JSON.parse("null")
+    js_null = js.JSON.parse("null") if hasattr(js, "JSON") else None
 except ImportError:
     js_null = None
 
@@ -49,17 +49,31 @@ class D1Executor:
                 return js_null
 
         if value is None:
-            return js_null
+            return None
 
         # Handle strings that look like JS nulls
         if isinstance(value, str):
             lowered = value.strip().lower()
             if lowered in ("undefined", "null", "[object undefined]", "[object null]"):
-                return js_null
+                return None
+            return value
 
-        primitive_types = (str, int, float, bool, bytes, bytearray, memoryview)
+        primitive_types = (int, float, bool, bytes, bytearray, memoryview)
         if isinstance(value, primitive_types):
             return value
+
+        # Normalize non-string objects by their string representation when possible.
+        try:
+            rendered = str(value).strip()
+            if rendered.lower() in (
+                "undefined",
+                "null",
+                "[object undefined]",
+                "[object null]",
+            ):
+                return None
+        except Exception:
+            pass
 
         # Last-resort fallback: attempt string conversion or return None
         try:

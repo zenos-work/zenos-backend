@@ -64,7 +64,7 @@ async def handle_users(request, env, path, method, query, ctx):
         if not targets:
             # Fallback for development/testing: if no approvers exist, include the sender
             # so the workflow doesn't block.
-            is_dev = env.get("ENVIRONMENT") == "development"
+            is_dev = getattr(env, "ENVIRONMENT", "") == "development"
             if is_dev and user.get("sub"):
                 targets = [user["sub"]]
             else:

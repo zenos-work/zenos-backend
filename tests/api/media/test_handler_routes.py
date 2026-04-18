@@ -24,7 +24,7 @@ class _Obj:
 
 
 class _Svc:
-    async def get_public(self, key):
+    async def get_public(self, key, options=None):
         if key == "boom":
             raise RuntimeError("storage down")
         if key == "missing":

@@ -296,9 +296,10 @@ class TestSeriesServiceLifecycle:
         svc.repo = AsyncMock()
         # Mock article belongs to author-001
         mock_article = MagicMock(spec=Article)
+        mock_article.id = "article-xyz"
         mock_article.author_id = "author-001"
         svc.article_service = AsyncMock()
-        svc.article_service.get_by_id = AsyncMock(return_value=mock_article)
+        svc.article_service.get_by_id_or_slug = AsyncMock(return_value=mock_article)
         svc.repo.find_by_id = AsyncMock(return_value=sample_series)
         svc.repo.article_series_exists = AsyncMock(return_value=True)
         svc.repo.update_article_part = AsyncMock()
@@ -325,9 +326,10 @@ class TestSeriesServiceLifecycle:
         svc = SeriesService(mock_env, mock_ctx)
         svc.repo = AsyncMock()
         mock_article = MagicMock(spec=Article)
+        mock_article.id = "article-new"
         mock_article.author_id = "author-001"
         svc.article_service = AsyncMock()
-        svc.article_service.get_by_id = AsyncMock(return_value=mock_article)
+        svc.article_service.get_by_id_or_slug = AsyncMock(return_value=mock_article)
         svc.repo.find_by_id = AsyncMock(return_value=sample_series)
         svc.repo.article_series_exists = AsyncMock(return_value=False)
         svc.repo.assign_article = AsyncMock()
