@@ -46,8 +46,21 @@ async def handle_media(request, env, path, method, query, ctx):
     # Public media access: GET /api/media/:key
     if method == "GET" and action and action != "upload":
         key = "/".join(parts[3:])
+        range_header = request.headers.get("Range")
+        r2_options = None
+        if range_header and range_header.startswith("bytes="):
+            try:
+                r_val = range_header.split("=")[1].split("-")
+                start = int(r_val[0])
+                r2_options = {"range": {"offset": start}}
+                if r_val[1]:
+                    end = int(r_val[1])
+                    r2_options["range"]["length"] = end - start + 1
+            except (ValueError, IndexError):
+                pass
+
         try:
-            obj = await svc.get_public(key)
+            obj = await svc.get_public(key, r2_options)
         except RuntimeError as e:
             return error(str(e), 503)
         if not obj:
@@ -62,9 +75,20 @@ async def handle_media(request, env, path, method, query, ctx):
                 ("Content-Type", content_type),
                 ("Cache-Control", "public, max-age=31536000, immutable"),
                 ("Access-Control-Allow-Origin", "*"),
+                ("Accept-Ranges", "bytes"),
             ]
         )
-        return Response.new(obj.body, status=200, headers=headers)
+
+        status = 200
+        if hasattr(obj, "range") and obj.range:
+            status = 206
+            total = getattr(obj, "totalSize", obj.size)
+            headers.set(
+                "Content-Range",
+                f"bytes {obj.range.offset}-{obj.range.offset + obj.size - 1}/{total}",
+            )
+
+        return Response.new(obj.body, status=status, headers=headers)
 
     user = await get_user(request, env)
     if not user:

@@ -549,3 +549,223 @@ class TestAdminHandler:
         )
 
         assert resp.status_code == 422
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Internal delivery-dispatch endpoints (service-secret auth)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class _EnvWithSecret:
+    """Fake env that exposes ZENOS_SERVICE_SECRET."""
+
+    DB = None
+    ZENOS_SERVICE_SECRET = "test-secret-abc"
+
+
+class _SvcDelivery(_Svc):
+    """Extends _Svc with delivery-related methods."""
+
+    async def get_pending_delivery(self, channel, limit):
+        self.calls.append(("get_pending_delivery", channel, limit))
+        return {"channel": channel, "items": [], "count": 0}
+
+    async def bulk_update_delivery_status(self, updates):
+        self.calls.append(("bulk_update_delivery_status", updates))
+        return {"succeeded": len(updates), "failed": 0, "total": len(updates)}
+
+
+@pytest.fixture
+def delivery_svc(monkeypatch):
+    s = _SvcDelivery()
+    monkeypatch.setattr(admin_handler, "AdminService", lambda env, ctx: s)
+    return s
+
+
+class TestDeliveryEndpoints:
+    # ── GET pending-delivery ─────────────────────────────────────────────────
+
+    @pytest.mark.asyncio
+    async def test_pending_delivery_missing_secret_env_returns_403(self, delivery_svc):
+        """No ZENOS_SERVICE_SECRET on env → always 403."""
+        req = _Req("GET", "/api/admin/notifications/pending-delivery")
+        req.headers = {"authorization": "Bearer test-secret-abc"}
+        resp = await admin_handler.handle_admin(
+            req,
+            _Env(),  # no ZENOS_SERVICE_SECRET attr
+            "/api/admin/notifications/pending-delivery",
+            "GET",
+            {"channel": ["email"]},
+            _Ctx(),
+        )
+        assert resp.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_pending_delivery_wrong_secret_returns_403(self, delivery_svc):
+        req = _Req("GET", "/api/admin/notifications/pending-delivery")
+        req.headers = {"authorization": "Bearer WRONG-secret"}
+        resp = await admin_handler.handle_admin(
+            req,
+            _EnvWithSecret(),
+            "/api/admin/notifications/pending-delivery",
+            "GET",
+            {"channel": ["email"]},
+            _Ctx(),
+        )
+        assert resp.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_pending_delivery_no_auth_header_returns_403(self, delivery_svc):
+        req = _Req("GET", "/api/admin/notifications/pending-delivery")
+        req.headers = {}
+        resp = await admin_handler.handle_admin(
+            req,
+            _EnvWithSecret(),
+            "/api/admin/notifications/pending-delivery",
+            "GET",
+            {},
+            _Ctx(),
+        )
+        assert resp.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_pending_delivery_email_channel_success(self, delivery_svc):
+        req = _Req("GET", "/api/admin/notifications/pending-delivery")
+        req.headers = {"authorization": "Bearer test-secret-abc"}
+        resp = await admin_handler.handle_admin(
+            req,
+            _EnvWithSecret(),
+            "/api/admin/notifications/pending-delivery",
+            "GET",
+            {"channel": ["email"], "limit": ["50"]},
+            _Ctx(),
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["channel"] == "email"
+        assert ("get_pending_delivery", "email", 50) in delivery_svc.calls
+
+    @pytest.mark.asyncio
+    async def test_pending_delivery_push_channel_success(self, delivery_svc):
+        req = _Req("GET", "/api/admin/notifications/pending-delivery")
+        req.headers = {"authorization": "Bearer test-secret-abc"}
+        resp = await admin_handler.handle_admin(
+            req,
+            _EnvWithSecret(),
+            "/api/admin/notifications/pending-delivery",
+            "GET",
+            {"channel": ["push"]},
+            _Ctx(),
+        )
+        assert resp.status_code == 200
+        assert ("get_pending_delivery", "push", 100) in delivery_svc.calls
+
+    @pytest.mark.asyncio
+    async def test_pending_delivery_limit_capped_at_500(self, delivery_svc):
+        req = _Req("GET", "/api/admin/notifications/pending-delivery")
+        req.headers = {"authorization": "Bearer test-secret-abc"}
+        resp = await admin_handler.handle_admin(
+            req,
+            _EnvWithSecret(),
+            "/api/admin/notifications/pending-delivery",
+            "GET",
+            {"channel": ["email"], "limit": ["9999"]},
+            _Ctx(),
+        )
+        assert resp.status_code == 200
+        # limit capped to 500
+        assert ("get_pending_delivery", "email", 500) in delivery_svc.calls
+
+    # ── POST delivery-status ─────────────────────────────────────────────────
+
+    @pytest.mark.asyncio
+    async def test_delivery_status_missing_secret_returns_403(self, delivery_svc):
+        req = _ReqJson("POST", "/api/admin/notifications/delivery-status", {})
+        req.headers = {"authorization": "Bearer test-secret-abc"}
+        resp = await admin_handler.handle_admin(
+            req,
+            _Env(),
+            "/api/admin/notifications/delivery-status",
+            "POST",
+            {},
+            _Ctx(),
+        )
+        assert resp.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_delivery_status_wrong_secret_returns_403(self, delivery_svc):
+        req = _ReqJson("POST", "/api/admin/notifications/delivery-status", {})
+        req.headers = {"authorization": "Bearer WRONG"}
+        resp = await admin_handler.handle_admin(
+            req,
+            _EnvWithSecret(),
+            "/api/admin/notifications/delivery-status",
+            "POST",
+            {},
+            _Ctx(),
+        )
+        assert resp.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_delivery_status_success(self, delivery_svc):
+        updates = [
+            {"notification_id": "n1", "status": "delivered", "external_ref": "msg-123"},
+        ]
+        req = _ReqJson(
+            "POST",
+            "/api/admin/notifications/delivery-status",
+            {"updates": updates},
+        )
+        req.headers = {"authorization": "Bearer test-secret-abc"}
+        resp = await admin_handler.handle_admin(
+            req,
+            _EnvWithSecret(),
+            "/api/admin/notifications/delivery-status",
+            "POST",
+            {},
+            _Ctx(),
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["succeeded"] == 1
+        assert data["total"] == 1
+
+    @pytest.mark.asyncio
+    async def test_delivery_status_empty_updates(self, delivery_svc):
+        req = _ReqJson(
+            "POST",
+            "/api/admin/notifications/delivery-status",
+            {"updates": []},
+        )
+        req.headers = {"authorization": "Bearer test-secret-abc"}
+        resp = await admin_handler.handle_admin(
+            req,
+            _EnvWithSecret(),
+            "/api/admin/notifications/delivery-status",
+            "POST",
+            {},
+            _Ctx(),
+        )
+        assert resp.status_code == 200
+        assert resp.json()["total"] == 0
+
+    @pytest.mark.asyncio
+    async def test_delivery_status_bad_json_treated_as_empty(self, delivery_svc):
+        """A request where json() raises should be handled gracefully (empty updates)."""
+
+        class _BadJsonReq(_Req):
+            async def json(self):
+                raise ValueError("bad json")
+
+        req = _BadJsonReq("POST", "/api/admin/notifications/delivery-status")
+        req.headers = {"authorization": "Bearer test-secret-abc"}
+        resp = await admin_handler.handle_admin(
+            req,
+            _EnvWithSecret(),
+            "/api/admin/notifications/delivery-status",
+            "POST",
+            {},
+            _Ctx(),
+        )
+        assert resp.status_code == 200
+        assert resp.json()["total"] == 0

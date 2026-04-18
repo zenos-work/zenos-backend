@@ -86,7 +86,8 @@ SELECT
   s.description,
   s.cover_image_url,
   asoc.part_number,
-  (SELECT COUNT(*) FROM article_series WHERE series_id = s.id) as total_parts
+  (SELECT COUNT(*) FROM article_series WHERE series_id = s.id) as total_parts,
+  (SELECT group_concat(a2.slug || ':' || as2.part_number) FROM article_series as2 INNER JOIN articles a2 ON as2.article_id = a2.id WHERE as2.series_id = s.id) as all_parts
 FROM article_series asoc
 INNER JOIN series s ON asoc.series_id = s.id
 WHERE asoc.article_id = ?

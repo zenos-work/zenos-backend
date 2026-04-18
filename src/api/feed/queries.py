@@ -8,7 +8,7 @@ _BASE = (
 
 # ── LATEST ──────────────────────────────────────────────────────────
 SELECT_FEED_LATEST = (
-    _BASE + " WHERE a.status = ?" " ORDER BY a.published_at DESC LIMIT ? OFFSET ?"
+    _BASE + " WHERE a.status = ? ORDER BY a.published_at DESC LIMIT ? OFFSET ?"
 )
 
 COUNT_FEED_LATEST = "SELECT COUNT(*) AS c FROM articles WHERE status = ?"

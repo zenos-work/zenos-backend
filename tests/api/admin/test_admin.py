@@ -465,3 +465,172 @@ async def test_update_ranking_weights_rejects_out_of_range_values():
 
     with _pytest.raises(ValueError, match="likes_weight must be between"):
         await svc.update_ranking_weights({"likes_weight": 99}, actor_id="u-admin")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Delivery service methods
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class _DeliveryRepo(DummyRepo):
+    def __init__(self):
+        self.delivery_updates = []
+        self._pending_rows = []
+        self._push_subs = []
+
+    async def find_pending_delivery_by_channel(self, channel, limit):
+        return list(self._pending_rows)
+
+    async def find_push_subs_for_users(self, user_ids):
+        return [s for s in self._push_subs if s["user_id"] in user_ids]
+
+    async def update_notification_delivery_status(
+        self, notif_id, status, external_ref=""
+    ):
+        self.delivery_updates.append((notif_id, status, external_ref))
+
+
+@pytest.mark.asyncio
+async def test_get_pending_delivery_email_channel():
+    repo = _DeliveryRepo()
+    repo._pending_rows = [
+        {
+            "id": "n1",
+            "user_id": "u1",
+            "user_email": "a@b.com",
+            "message": "hi",
+            "channel": "email",
+        },
+        {
+            "id": "n2",
+            "user_id": "u2",
+            "user_email": "c@d.com",
+            "message": "hello",
+            "channel": "email",
+        },
+    ]
+    svc = AdminService(DummyEnv(), DummyCtx())
+    svc._repo = repo
+
+    result = await svc.get_pending_delivery("email", 50)
+
+    assert result["channel"] == "email"
+    assert result["count"] == 2
+    assert len(result["notifications"]) == 2
+
+
+@pytest.mark.asyncio
+async def test_get_pending_delivery_push_attaches_subscriptions():
+    repo = _DeliveryRepo()
+    repo._pending_rows = [
+        {"id": "n1", "user_id": "u1", "message": "push!", "channel": "push"},
+    ]
+    repo._push_subs = [
+        {
+            "user_id": "u1",
+            "endpoint": "https://fcm.example.com/1",
+            "p256dh_key": "KEY",
+            "auth_key": "AUTH",
+        },
+    ]
+    svc = AdminService(DummyEnv(), DummyCtx())
+    svc._repo = repo
+
+    result = await svc.get_pending_delivery("push", 100)
+
+    assert result["channel"] == "push"
+    assert len(result["notifications"]) == 1
+    subs = result["notifications"][0]["push_subscriptions"]
+    assert len(subs) == 1
+    assert subs[0]["endpoint"] == "https://fcm.example.com/1"
+
+
+@pytest.mark.asyncio
+async def test_get_pending_delivery_invalid_channel_falls_back_to_email():
+    repo = _DeliveryRepo()
+    svc = AdminService(DummyEnv(), DummyCtx())
+    svc._repo = repo
+
+    result = await svc.get_pending_delivery("sms", 10)  # invalid channel
+
+    assert result["channel"] == "email"  # falls back
+
+
+@pytest.mark.asyncio
+async def test_bulk_update_delivery_status_success():
+    repo = _DeliveryRepo()
+    svc = AdminService(DummyEnv(), DummyCtx())
+    svc._repo = repo
+
+    updates = [
+        {"id": "n1", "status": "delivered", "external_ref": "msg-abc"},
+        {"id": "n2", "status": "failed", "external_ref": ""},
+    ]
+    result = await svc.bulk_update_delivery_status(updates)
+
+    assert result["succeeded"] == 2
+    assert result["failed"] == 0
+    assert result["total"] == 2
+    assert ("n1", "delivered", "msg-abc") in repo.delivery_updates
+    assert ("n2", "failed", "") in repo.delivery_updates
+
+
+@pytest.mark.asyncio
+async def test_bulk_update_delivery_status_invalid_status_counts_as_failed():
+    repo = _DeliveryRepo()
+    svc = AdminService(DummyEnv(), DummyCtx())
+    svc._repo = repo
+
+    updates = [
+        {"id": "n1", "status": "unknown-status"},
+        {"id": "n2", "status": "delivered"},
+    ]
+    result = await svc.bulk_update_delivery_status(updates)
+
+    assert result["succeeded"] == 1
+    assert result["failed"] == 1
+    assert result["total"] == 2
+
+
+@pytest.mark.asyncio
+async def test_bulk_update_delivery_status_missing_id_counts_as_failed():
+    repo = _DeliveryRepo()
+    svc = AdminService(DummyEnv(), DummyCtx())
+    svc._repo = repo
+
+    updates = [{"status": "delivered"}]  # no "id"
+    result = await svc.bulk_update_delivery_status(updates)
+
+    assert result["failed"] == 1
+    assert result["succeeded"] == 0
+
+
+@pytest.mark.asyncio
+async def test_bulk_update_delivery_status_empty_input():
+    repo = _DeliveryRepo()
+    svc = AdminService(DummyEnv(), DummyCtx())
+    svc._repo = repo
+
+    result = await svc.bulk_update_delivery_status([])
+
+    assert result["total"] == 0
+    assert result["succeeded"] == 0
+    assert result["failed"] == 0
+
+
+@pytest.mark.asyncio
+async def test_bulk_update_delivery_status_repo_failure_counts_as_failed():
+    class _FailingRepo(_DeliveryRepo):
+        async def update_notification_delivery_status(
+            self, notif_id, status, external_ref=""
+        ):
+            raise RuntimeError("DB error")
+
+    svc = AdminService(DummyEnv(), DummyCtx())
+    svc._repo = _FailingRepo()
+
+    updates = [{"id": "n1", "status": "delivered"}]
+    result = await svc.bulk_update_delivery_status(updates)
+
+    assert result["failed"] == 1
+    assert result["succeeded"] == 0

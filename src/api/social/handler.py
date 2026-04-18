@@ -188,18 +188,24 @@ async def handle_social(request, env, path, method, query, ctx):
             return error(str(e), 404)
 
     # ── FOLLOWS ────────────────────────────────────
-    # POST /api/social/follows/:user_id — Follow a user
+    # POST /api/social/follows/:user_id — Follow a user (or tag/series via ?type=)
     if action == "follows" and target and method == "POST":
         try:
-            result = await svc.toggle_follow(uid, target, add=True)
+            following_type = query.get("type", ["user"])[0]
+            result = await svc.toggle_follow(
+                uid, target, add=True, following_type=following_type
+            )
             return json_resp({"action": result.to_dict()})
         except ValueError as e:
             return error(str(e), 409)
 
-    # DELETE /api/social/follows/:user_id — Unfollow a user
+    # DELETE /api/social/follows/:user_id — Unfollow a user (or tag/series via ?type=)
     if action == "follows" and target and method == "DELETE":
         try:
-            result = await svc.toggle_follow(uid, target, add=False)
+            following_type = query.get("type", ["user"])[0]
+            result = await svc.toggle_follow(
+                uid, target, add=False, following_type=following_type
+            )
             return json_resp({"action": result.to_dict()})
         except ValueError as e:
             return error(str(e), 409)
@@ -207,7 +213,10 @@ async def handle_social(request, env, path, method, query, ctx):
     # GET /api/social/follows/:user_id/check — Check if following
     if action == "follows" and target and subaction == "check" and method == "GET":
         try:
-            is_following = await svc.check_following(uid, target)
+            following_type = query.get("type", ["user"])[0]
+            is_following = await svc.check_following(
+                uid, target, following_type=following_type
+            )
             return json_resp({"is_following": is_following})
         except ValueError as e:
             return error(str(e), 404)
@@ -258,5 +267,49 @@ async def handle_social(request, env, path, method, query, ctx):
             return json_resp(stats)
         except ValueError as e:
             return error(str(e), 404)
+
+    # ── CONNECTED SOCIAL ACCOUNTS (SR-024) ────────────────
+    # GET /api/social/accounts — List the current user's connected accounts
+    if action == "accounts" and not target and method == "GET":
+        accounts = await svc.list_connected_accounts(uid)
+        return json_resp({"data": accounts})
+
+    # POST /api/social/accounts/connect — Connect/update a social account
+    if action == "accounts" and target == "connect" and method == "POST":
+        try:
+            body = await request.json()
+            provider = body.get("provider", "")
+            result = await svc.connect_social_account(
+                user_id=uid,
+                provider=provider,
+                provider_uid=body.get("provider_uid", ""),
+                access_token=body.get("access_token", ""),
+                refresh_token=body.get("refresh_token", ""),
+                token_expires_at=body.get("token_expires_at"),
+                handle=body.get("handle", ""),
+                display_name=body.get("display_name", ""),
+                scopes=body.get("scopes", []),
+            )
+            return json_resp(result, status=201)
+        except ValueError as e:
+            return error(str(e), 400)
+
+    # DELETE /api/social/accounts/:provider — Disconnect a social account
+    if action == "accounts" and target and method == "DELETE":
+        try:
+            await svc.disconnect_social_account(uid, target)
+            return json_resp({"disconnected": True})
+        except ValueError as e:
+            return error(str(e), 400)
+
+    # GET /api/social/share-url/:article_id/:provider — Get share deep-link URL
+    if action == "share-url" and target and subaction and method == "GET":
+        try:
+            article_url = query.get("article_url", [""])[0]
+            article_title = query.get("title", [""])[0]
+            url = await svc.get_share_url(subaction, article_url, article_title)
+            return json_resp({"url": url, "provider": subaction})
+        except ValueError as e:
+            return error(str(e), 400)
 
     return error("Not found", 404)

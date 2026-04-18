@@ -169,6 +169,70 @@ class TestArticleService:
         with pytest.raises(ValueError, match="Unknown status"):
             await svc.transition("a1", "BOGUS")
 
+    @pytest.mark.asyncio
+    async def test_duplicate_and_add_coauthor(self, monkeypatch):
+        svc = ArticleService(_Env())
+
+        source = _article(id="src-1", title="Original")
+        source.content = "z" * 120
+        source.content_type = "article"
+        source.tags = [type("TagObj", (), {"id": "t1"})()]
+
+        class _Repo:
+            async def find_by_id_or_slug(self, identifier):
+                if identifier == "src-1":
+                    return source
+                return None
+
+            async def insert(self, *args, **kwargs):
+                if kwargs:
+                    created_id = kwargs["aid"]
+                    created_title = kwargs["title"]
+                else:
+                    created_id = args[0]
+                    created_title = args[2]
+                return _article(id=created_id, title=created_title)
+
+            async def sync_tags(self, article_id, tag_ids):
+                self.synced = (article_id, tag_ids)
+
+            async def _fetch_tags(self, _article_id):
+                return []
+
+            async def user_exists(self, user_id):
+                return user_id != "missing"
+
+            async def is_coauthor(self, article_id, user_id):
+                return (article_id, user_id) == ("src-1", "exists")
+
+            async def add_coauthor(self, article_id, user_id, added_by):
+                self.coauthor_added = (article_id, user_id, added_by)
+
+        repo = _Repo()
+        svc._repo = repo
+
+        monkeypatch.setattr("api.articles.service.new_id", lambda: "dup-1")
+        monkeypatch.setattr(
+            "api.articles.service.unique_slug", lambda title: f"slug-{title[:5]}"
+        )
+        monkeypatch.setattr("api.articles.service.calc_read_time", lambda content: 3)
+
+        duplicated = await svc.duplicate_article("src-1", "u-author")
+        assert duplicated is not None
+        assert duplicated.id == "dup-1"
+        assert duplicated.title.endswith("(Copy)")
+        assert repo.synced == ("dup-1", ["t1"])
+
+        created = await svc.add_coauthor("src-1", "u-2", "u-author")
+        assert created["added"] is True
+        assert repo.coauthor_added == ("src-1", "u-2", "u-author")
+
+        existing = await svc.add_coauthor("src-1", "exists", "u-author")
+        assert existing["added"] is False
+
+        with pytest.raises(ValueError, match="User not found"):
+            await svc.add_coauthor("src-1", "missing", "u-author")
+
 
 class TestArticleRepository:
     @pytest.mark.asyncio
@@ -372,3 +436,30 @@ class TestArticleRepository:
             "",
             "pending review",
         )
+
+    @pytest.mark.asyncio
+    async def test_coauthor_repository_methods(self):
+        repo = ArticleRepository.__new__(ArticleRepository)
+        executed = []
+
+        async def _find_one(sql, *params):
+            if sql == Q.SELECT_USER_EXISTS_BY_ID:
+                return {"id": params[0]} if params[0] == "u1" else None
+            if sql == Q.SELECT_COAUTHOR_EXISTS:
+                return {"ok": 1} if params == ("a1", "u2") else None
+            return None
+
+        async def _execute(sql, *params):
+            executed.append((sql, params))
+
+        repo.find_one = _find_one
+        repo.execute = _execute
+
+        assert await repo.user_exists("u1") is True
+        assert await repo.user_exists("missing") is False
+        assert await repo.is_coauthor("a1", "u2") is True
+        assert await repo.is_coauthor("a1", "u3") is False
+
+        await repo.add_coauthor("a1", "u4", "u1")
+        assert executed[-1][0] == Q.INSERT_ARTICLE_COAUTHOR
+        assert executed[-1][1] == ("a1", "u4", "u1")

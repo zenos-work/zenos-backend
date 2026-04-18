@@ -5,7 +5,7 @@ from .log_models import LogEntry
 
 class ElkForwarder:
     def __init__(self, url, index="zenos-logs", api_key=None):
-        self.bulk_url = f'{url.rstrip("/")}/_bulk'
+        self.bulk_url = f"{url.rstrip('/')}/_bulk"
         self.index = index
         self.api_key = api_key
 

@@ -11,8 +11,7 @@ SELECT_BY_ARTICLE = (
 )
 
 COUNT_BY_ARTICLE = (
-    "SELECT COUNT(*) as count FROM comments"
-    " WHERE article_id = ? AND parent_id IS NULL"
+    "SELECT COUNT(*) as count FROM comments WHERE article_id = ? AND parent_id IS NULL"
 )
 
 SELECT_REPLIES_BY_PARENT = (
@@ -40,9 +39,7 @@ INSERT_COMMENT = (
 )
 
 INSERT_COMMENT_NO_PARENT = (
-    "INSERT INTO comments"
-    " (id, article_id, author_id, content)"
-    " VALUES (?, ?, ?, ?)"
+    "INSERT INTO comments (id, article_id, author_id, content) VALUES (?, ?, ?, ?)"
 )
 
 UPDATE_COMMENT = (
@@ -52,9 +49,7 @@ UPDATE_COMMENT = (
 )
 
 SOFT_DELETE = (
-    "UPDATE comments"
-    ' SET is_deleted = 1, updated_at = datetime("now")'
-    " WHERE id = ?"
+    'UPDATE comments SET is_deleted = 1, updated_at = datetime("now") WHERE id = ?'
 )
 
 INCREMENT_FLAG_COUNT = "UPDATE comments SET flag_count = flag_count + 1 WHERE id = ?"

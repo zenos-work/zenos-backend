@@ -72,8 +72,7 @@ SELECT_PUBLISHED_SEARCH = SELECT_PUBLISHED_SEARCH_NEWEST
 SELECT_BY_ID_OR_SLUG = SELECT_BASE + " WHERE a.id = ? OR a.slug = ?"
 
 SELECT_BY_AUTHOR = (
-    SELECT_BASE + " WHERE a.author_id = ?"
-    " ORDER BY a.updated_at DESC LIMIT ? OFFSET ?"
+    SELECT_BASE + " WHERE a.author_id = ? ORDER BY a.updated_at DESC LIMIT ? OFFSET ?"
 )
 
 SELECT_BY_AUTHOR_AND_STATUS = (
@@ -110,7 +109,7 @@ UPDATE_ARTICLE = (
 )
 
 UPDATE_STATUS = (
-    'UPDATE articles SET status = ?, updated_at = datetime("now")' " WHERE id = ?"
+    'UPDATE articles SET status = ?, updated_at = datetime("now") WHERE id = ?'
 )
 
 UPDATE_APPROVE = (
@@ -175,7 +174,18 @@ INSERT_ARTICLE_TAG = (
 DELETE_ARTICLE_TAGS = "DELETE FROM article_tags WHERE article_id = ?"
 
 SELECT_APPROVER_IDS = (
-    "SELECT id FROM users" " WHERE role IN ('APPROVER', 'SUPERADMIN') AND is_active = 1"
+    "SELECT id FROM users WHERE role IN ('APPROVER', 'SUPERADMIN') AND is_active = 1"
+)
+
+SELECT_USER_EXISTS_BY_ID = "SELECT id FROM users WHERE id = ? LIMIT 1"
+
+SELECT_COAUTHOR_EXISTS = (
+    "SELECT 1 FROM article_coauthors WHERE article_id = ? AND user_id = ? LIMIT 1"
+)
+
+INSERT_ARTICLE_COAUTHOR = (
+    "INSERT OR IGNORE INTO article_coauthors (article_id, user_id, added_by)"
+    " VALUES (?, ?, ?)"
 )
 
 INSERT_NOTIFICATION = (
@@ -192,10 +202,7 @@ SELECT_CONTENT_TYPES_PUBLIC = (
 )
 
 SELECT_CONTENT_TYPE_EXISTS = (
-    "SELECT 1 AS ok"
-    " FROM content_types"
-    " WHERE slug = ? AND is_active = 1"
-    " LIMIT 1"
+    "SELECT 1 AS ok FROM content_types WHERE slug = ? AND is_active = 1 LIMIT 1"
 )
 
 # Phase 2: Related articles by sharing tags, trending sort
@@ -207,4 +214,30 @@ SELECT_RELATED_ARTICLES = (
     " ORDER BY (a.likes_count * 3 + a.comments_count * 2 + a.shares_count * 4 - a.dislikes_count * 2 + a.views_count * 0.02) DESC,"
     "          a.published_at DESC"
     " LIMIT ?"
+)
+
+# ── Phase 3 Step 18: Security-level aware queries ──────────────────────────
+# Public-only feed: appends to published list queries
+SELECT_PUBLISHED_PUBLIC_ONLY = (
+    SELECT_BASE + " WHERE a.status = 'PUBLISHED' AND a.security_level = 'public'"
+    " ORDER BY a.published_at DESC LIMIT ? OFFSET ?"
+)
+
+# Org-member aware query: returns articles the user can see within an org
+SELECT_ORG_ARTICLES = (
+    SELECT_BASE + " WHERE a.org_id = ? AND a.status = 'PUBLISHED'"
+    " AND (a.security_level = 'public'"
+    "  OR (a.security_level = 'internal')"
+    "  OR (a.security_level = 'confidential'"
+    "      AND (a.author_id = ? OR EXISTS ("
+    "        SELECT 1 FROM org_members om"
+    "        WHERE om.org_id = a.org_id AND om.user_id = ?"
+    "        AND om.org_role IN ('owner','admin','editor'))))"
+    "  OR (a.security_level = 'restricted'"
+    "      AND EXISTS ("
+    "        SELECT 1 FROM org_members om"
+    "        WHERE om.org_id = a.org_id AND om.user_id = ?"
+    "        AND om.org_role IN ('owner','admin')))"
+    " )"
+    " ORDER BY a.published_at DESC LIMIT ? OFFSET ?"
 )

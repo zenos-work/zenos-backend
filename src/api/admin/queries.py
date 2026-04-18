@@ -76,18 +76,23 @@ COUNT_NOTIFICATIONS_BY_USER = (
 
 INSERT_NOTIFICATION = (
     "INSERT INTO notifications"
-    " (id, user_id, actor_id, type, article_id, comment_id, message)"
-    " VALUES (?, ?, NULLIF(?, ''), ?, NULLIF(?, ''), NULLIF(?, ''), ?)"
+    " (id, user_id, actor_id, type, article_id, comment_id, message,"
+    "  channel, delivery_status, group_key)"
+    " VALUES (?, ?, NULLIF(?, ''), ?, NULLIF(?, ''), NULLIF(?, ''), ?,"
+    "  COALESCE(NULLIF(?, ''), 'in_app'), 'pending', NULLIF(?, ''))"
 )
 
 UPDATE_MARK_NOTIFICATIONS_READ = (
-    "UPDATE notifications SET is_read = 1" " WHERE user_id = ? AND is_read = 0"
+    "UPDATE notifications SET is_read = 1 WHERE user_id = ? AND is_read = 0"
 )
 
 UPDATE_MARK_NOTIFICATION_READ_BY_ID = (
-    "UPDATE notifications SET is_read = 1"
-    " WHERE user_id = ? AND id = ? AND is_read = 0"
+    "UPDATE notifications SET is_read = 1 WHERE user_id = ? AND id = ? AND is_read = 0"
 )
+
+DELETE_ALL_NOTIFICATIONS = "DELETE FROM notifications WHERE user_id = ?"
+
+DELETE_NOTIFICATION = "DELETE FROM notifications WHERE user_id = ? AND id = ?"
 
 SELECT_CONTENT_TYPES_ADMIN = (
     "SELECT id, slug, name, description, is_active, is_system, sort_order, created_by, created_at, updated_at"
@@ -125,6 +130,35 @@ SELECT_SUCCESS_SIGNAL_HISTORY_BY_ARTICLE = (
     " WHERE article_id = ?"
     " ORDER BY bucket_hour DESC"
     " LIMIT ?"
+)
+
+# ── Notification delivery dispatch ────────────────────────────────────────────
+
+SELECT_PENDING_DELIVERY_BY_CHANNEL = (
+    "SELECT n.id, n.user_id, n.message, n.type, n.group_key, n.channel,"
+    "       u.email AS user_email, u.name AS user_name"
+    " FROM notifications n"
+    " JOIN users u ON u.id = n.user_id"
+    " WHERE n.delivery_status = 'pending'"
+    "   AND n.channel = ?"
+    " ORDER BY n.created_at ASC"
+    " LIMIT ?"
+)
+
+# Placeholders filled in by repository: e.g. "?,?,?"
+SELECT_PUSH_SUBS_FOR_USERS = (
+    "SELECT ps.user_id, ps.endpoint, ps.p256dh_key, ps.auth_key, ps.platform"
+    " FROM push_subscriptions ps"
+    " WHERE ps.is_active = 1"
+    "   AND ps.user_id IN ({placeholders})"
+)
+
+UPDATE_NOTIFICATION_DELIVERY_STATUS = (
+    "UPDATE notifications"
+    " SET delivery_status = ?,"
+    "     delivered_at = CASE WHEN ? = 'delivered' THEN datetime('now') ELSE NULL END,"
+    "     external_ref = COALESCE(NULLIF(?, ''), external_ref)"
+    " WHERE id = ?"
 )
 
 SELECT_RANKING_WEIGHTS = (
