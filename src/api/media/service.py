@@ -70,8 +70,8 @@ class MediaService:
         )
         return {"url": url, "key": key}
 
-    async def get_public(self, key: str):
-        obj = await self._repo.get(key)
+    async def get_public(self, key: str, options: dict = None):
+        obj = await self._repo.get(key, options)
         if not obj:
             return None
         return obj

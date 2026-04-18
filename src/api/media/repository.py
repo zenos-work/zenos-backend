@@ -11,9 +11,11 @@ class MediaRepository:
         self._r2 = r2_bucket
         self._ctx = ctx
 
-    async def get(self, key: str):
+    async def get(self, key: str, options: dict = None):
         if self._r2 is None:
             raise RuntimeError("Media storage is not configured")
+        if options:
+            return await self._r2.get(key, **options)
         return await self._r2.get(key)
 
     async def upload(

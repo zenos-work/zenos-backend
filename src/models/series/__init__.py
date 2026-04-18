@@ -11,6 +11,7 @@ _LIST_FIELDS = {
     "cover_image_url",
     "created_at",
     "updated_at",
+    "article_count",
 }
 _DETAIL_FIELDS = _LIST_FIELDS
 
@@ -25,6 +26,7 @@ class Series(BaseModel):
     description: Optional[str] = None
     cover_image_url: Optional[str] = None
     updated_at: str = ""
+    article_count: Optional[int] = 0
 
     def to_dict(self, scope: str = Scope.LIST) -> dict:
         allowed = {
@@ -51,6 +53,7 @@ class Series(BaseModel):
             description=row_get(row, "description"),
             cover_image_url=row_get(row, "cover_image_url"),
             updated_at=row_get(row, "updated_at", ""),
+            article_count=row_get(row, "article_count", 0),
         )
 
 
@@ -64,6 +67,9 @@ class ArticleSeriesInfo(BaseModel):
     total: int
     description: Optional[str] = None
     cover_image_url: Optional[str] = None
+    next_article_slug: Optional[str] = None
+    prev_article_slug: Optional[str] = None
+    parts: Optional[list] = None
 
     def to_dict(self, scope: str = Scope.LIST) -> dict:
         return {
@@ -73,15 +79,41 @@ class ArticleSeriesInfo(BaseModel):
             "total": self.total,
             "description": self.description,
             "cover_image_url": self.cover_image_url,
+            "next_article_slug": self.next_article_slug,
+            "prev_article_slug": self.prev_article_slug,
+            "parts": self.parts,
         }
 
     @classmethod
     def from_row(cls, row) -> "ArticleSeriesInfo":
+        parts_raw = row_get(row, "all_parts", "")
+        parts = []
+        next_slug = None
+        prev_slug = None
+        current_part = row_get(row, "part_number", 1)
+
+        if parts_raw:
+            for item in parts_raw.split(","):
+                if ":" in item:
+                    slug, p_num = item.rsplit(":", 1)
+                    p_num = int(p_num)
+                    parts.append({"slug": slug, "part": p_num})
+                    if p_num == current_part + 1:
+                        next_slug = slug
+                    elif p_num == current_part - 1:
+                        prev_slug = slug
+
+        # Sort parts by number
+        parts.sort(key=lambda x: x["part"])
+
         return cls(
             id=row_get(row, "id"),
             name=row_get(row, "name"),
-            part=row_get(row, "part_number"),
-            total=row_get(row, "total_parts"),
+            part=current_part,
+            total=row_get(row, "total_parts", 0),
             description=row_get(row, "description"),
             cover_image_url=row_get(row, "cover_image_url"),
+            next_article_slug=next_slug,
+            prev_article_slug=prev_slug,
+            parts=parts,
         )

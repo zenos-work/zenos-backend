@@ -49,6 +49,7 @@ from api.vault.handler import handle_vault
 from api.billing.handler import handle_billing
 from api.compliance.handler import handle_compliance
 from api.public_content.handler import handle_public_content
+from api.surveys.handler import handle_surveys
 
 from js import Response
 
@@ -269,5 +270,8 @@ class Default(WorkerEntrypoint):
         # Phase 3: Organizations CRUD + members + teams + invitations
         if path.startswith("/api/organizations"):
             return await handle_organizations(request, env, path, method, query, ctx)
+
+        if path.startswith("/api/surveys"):
+            return await handle_surveys(request, env, path, method, query, ctx)
 
         return json_resp({"error": "Not found"}, 404, env=env, request=request)

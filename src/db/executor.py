@@ -2,14 +2,10 @@ import inspect
 from typing import Optional, Any
 
 try:
-    # pyodide.ffi.to_js(None) creates a JsProxy wrapping JS null.
-    # Unlike js_JSON.parse("null") (which auto-converts JS null → Python None),
-    # to_js(None) produces a non-None Python proxy that, when passed as an
-    # argument to a JS function, correctly delivers JS null (not undefined).
-    from pyodide.ffi import to_js as _pyodide_to_js
+    import js
 
-    js_null = _pyodide_to_js(None)
-except ImportError:  # pragma: no cover - local test environment
+    js_null = js.JSON.parse("null")
+except ImportError:
     js_null = None
 
 
@@ -41,7 +37,7 @@ class D1Executor:
                     "[object Undefined]",
                     "[object Null]",
                 ):
-                    return None
+                    return js_null
                 # Try to convert proxy back to Python primitive if possible
                 to_py = getattr(value, "to_py", None)
                 if callable(to_py):
@@ -50,16 +46,16 @@ class D1Executor:
                     except (TypeError, ValueError):
                         value = to_py(depth=2)
             except Exception:
-                return None
+                return js_null
 
         if value is None:
-            return None
+            return js_null
 
         # Handle strings that look like JS nulls
         if isinstance(value, str):
             lowered = value.strip().lower()
             if lowered in ("undefined", "null", "[object undefined]", "[object null]"):
-                return None
+                return js_null
 
         primitive_types = (str, int, float, bool, bytes, bytearray, memoryview)
         if isinstance(value, primitive_types):
@@ -69,7 +65,7 @@ class D1Executor:
         try:
             return str(value)
         except Exception:
-            return None
+            return js_null
 
     def _normalize_params(self, params: tuple) -> tuple:
         return tuple(self._normalize_param(p) for p in params)

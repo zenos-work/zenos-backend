@@ -177,14 +177,14 @@ class FeatureFlagRepository(BaseRepository):
             Q.INSERT_NOTIFICATION,
             nid,
             user_id,
-            actor_id or "",
+            actor_id if actor_id else None,
             type_,
-            "",
-            "",
+            None,  # article_id
+            None,  # comment_id
             message,
             channel or "in_app",
             delivery_status or "pending",
-            group_key or "",
+            group_key or None,
         )
 
     # Alias to avoid collision with builtin find_all
