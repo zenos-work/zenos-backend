@@ -10,7 +10,10 @@
 
   "vars": {
     "ENVIRONMENT": "production",
-    "FRONTEND_URL": "https://zenos.work"
+    "FRONTEND_URL": "https://zenos.work",
+    "VAPID_PUBLIC_KEY": "",
+    "VAPID_PRIVATE_KEY_HEX": "",
+    "VAPID_SUBSCRIBER": ""
   },
 
   "d1_databases": [
@@ -40,7 +43,10 @@
       "name": "zenos-api-dev",
       "vars": {
         "ENVIRONMENT": "development",
-        "FRONTEND_URL": "http://localhost:5173"
+        "FRONTEND_URL": "http://localhost:5173",
+        "VAPID_PUBLIC_KEY": "",
+        "VAPID_PRIVATE_KEY_HEX": "",
+        "VAPID_SUBSCRIBER": ""
       },
       "d1_databases": [
         {
@@ -66,7 +72,10 @@
       "name": "zenos-api-staging",
       "vars": {
         "ENVIRONMENT": "staging",
-        "FRONTEND_URL": "https://staging.zenos.work"
+        "FRONTEND_URL": "https://staging.zenos.work",
+        "VAPID_PUBLIC_KEY": "",
+        "VAPID_PRIVATE_KEY_HEX": "",
+        "VAPID_SUBSCRIBER": ""
       },
       "d1_databases": [
         {
