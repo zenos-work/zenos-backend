@@ -5,11 +5,18 @@ and funnel event tracking across backend and frontend integration points.
 """
 
 import pytest
+from pathlib import Path
 from unittest.mock import MagicMock
 from api.membership.service import MembershipService
 from models.user.model import User
 from models.article.model import Article
 from datetime import datetime, timedelta, timezone
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+ZENOS_ROOT = REPO_ROOT.parent
+FRONTEND_ROOT = ZENOS_ROOT / "zenos-frontend"
+DB_ROOT = ZENOS_ROOT / "zenos-db"
+BACKEND_ROOT = REPO_ROOT
 
 
 @pytest.fixture
@@ -292,31 +299,32 @@ class TestMembershipE2ESmoke:
 
     def test_frontend_components_referenced(self):
         """Smoke test: Verify Phase 3 frontend components exist."""
-        import os
+        if not FRONTEND_ROOT.exists():
+            pytest.skip(
+                f"zenos-frontend repository is not available in this environment: {FRONTEND_ROOT}"
+            )
 
-        assert os.path.exists(
-            "/mnt/ai-enterprise-machine-shared-disk/projects/zenos/zenos-frontend/src/components/premium/PremiumPaywall.tsx"
-        )
-        assert os.path.exists(
-            "/mnt/ai-enterprise-machine-shared-disk/projects/zenos/zenos-frontend/src/components/premium/MembershipUpgradeCard.tsx"
-        )
-        assert os.path.exists(
-            "/mnt/ai-enterprise-machine-shared-disk/projects/zenos/zenos-frontend/src/hooks/usePremiumFunnel.ts"
-        )
+        assert (FRONTEND_ROOT / "src/components/premium/PremiumPaywall.tsx").exists()
+        assert (
+            FRONTEND_ROOT / "src/components/premium/MembershipUpgradeCard.tsx"
+        ).exists()
+        assert (FRONTEND_ROOT / "src/hooks/usePremiumFunnel.ts").exists()
 
     def test_database_migration_exists(self):
         """Smoke test: Verify Phase 3 migration file exists and is readable."""
-        import os
+        if not DB_ROOT.exists():
+            pytest.skip(
+                f"zenos-db repository is not available in this environment: {DB_ROOT}"
+            )
 
-        # Prefer current canonical membership migration, but allow legacy filename.
         candidates = [
-            "/mnt/ai-enterprise-machine-shared-disk/projects/zenos/zenos-db/migrations/0020_membership.sql",
-            "/mnt/ai-enterprise-machine-shared-disk/projects/zenos/zenos-db/migrations/0027_phase3_membership_and_premium.sql",
+            DB_ROOT / "migrations/0020_membership.sql",
+            DB_ROOT / "migrations/0027_phase3_membership_and_premium.sql",
         ]
-        migration_path = next((p for p in candidates if os.path.exists(p)), None)
+        migration_path = next((p for p in candidates if p.exists()), None)
         assert migration_path is not None
 
-        with open(migration_path, "r") as f:
+        with migration_path.open("r") as f:
             content = f.read()
             assert "membership_plans" in content
             assert "user_memberships" in content
@@ -325,22 +333,18 @@ class TestMembershipE2ESmoke:
 
     def test_membership_service_handler_routes_exist(self):
         """Smoke test: Verify membership API handler is registered."""
-        import os
-
-        handler_path = "/mnt/ai-enterprise-machine-shared-disk/projects/zenos/zenos-backend/src/api/membership/handler.py"
-        assert os.path.exists(handler_path)
-        with open(handler_path, "r") as f:
+        handler_path = BACKEND_ROOT / "src/api/membership/handler.py"
+        assert handler_path.exists()
+        with handler_path.open("r") as f:
             content = f.read()
             assert "handle_membership" in content
             assert "/api/membership/plans" in content or "membership/plans" in content
 
     def test_index_router_includes_membership_route(self):
         """Smoke test: Verify main router includes membership handler import."""
-        import os
-
-        index_path = "/mnt/ai-enterprise-machine-shared-disk/projects/zenos/zenos-backend/src/index.py"
-        assert os.path.exists(index_path)
-        with open(index_path, "r") as f:
+        index_path = BACKEND_ROOT / "src/index.py"
+        assert index_path.exists()
+        with index_path.open("r") as f:
             content = f.read()
             assert "handle_membership" in content
             assert "/api/membership" in content
