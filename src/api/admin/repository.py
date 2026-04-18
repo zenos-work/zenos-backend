@@ -115,6 +115,8 @@ class AdminRepository(BaseRepository):
         article_id: Optional[str],
         comment_id: Optional[str],
         message: str,
+        channel: str = "in_app",
+        group_key: Optional[str] = None,
     ) -> None:
         actor_val = actor_id or ""
         article_val = article_id or ""
@@ -128,6 +130,8 @@ class AdminRepository(BaseRepository):
             article_val,
             comment_val,
             message,
+            channel or "",
+            group_key or "",
         )
 
     async def mark_notifications_read(self, user_id: str) -> None:
@@ -137,6 +141,12 @@ class AdminRepository(BaseRepository):
         await self.execute(
             Q.UPDATE_MARK_NOTIFICATION_READ_BY_ID, user_id, notification_id
         )
+
+    async def delete_notification(self, user_id: str, notification_id: str) -> None:
+        await self.execute(Q.DELETE_NOTIFICATION, user_id, notification_id)
+
+    async def delete_all_notifications(self, user_id: str) -> None:
+        await self.execute(Q.DELETE_ALL_NOTIFICATIONS, user_id)
 
     async def list_content_types(self) -> list[dict]:
         rows = await self.find_all(Q.SELECT_CONTENT_TYPES_ADMIN)
@@ -303,3 +313,54 @@ class AdminRepository(BaseRepository):
             }
             for r in rows
         ]
+
+    # ── Notification delivery dispatch ────────────────────────────────────────
+
+    async def find_pending_delivery_by_channel(
+        self, channel: str, limit: int = 100
+    ) -> list[dict]:
+        """Return pending notifications for a given delivery channel with user info."""
+        rows = await self.find_all(Q.SELECT_PENDING_DELIVERY_BY_CHANNEL, channel, limit)
+        return [
+            {
+                "id": row_get(r, "id"),
+                "user_id": row_get(r, "user_id"),
+                "message": row_get(r, "message"),
+                "type": row_get(r, "type"),
+                "group_key": row_get(r, "group_key"),
+                "channel": row_get(r, "channel"),
+                "user_email": row_get(r, "user_email"),
+                "user_name": row_get(r, "user_name"),
+            }
+            for r in rows
+        ]
+
+    async def find_push_subs_for_users(self, user_ids: list[str]) -> list[dict]:
+        """Return active push subscriptions for a set of user IDs."""
+        if not user_ids:
+            return []
+        placeholders = ",".join("?" * len(user_ids))
+        sql = Q.SELECT_PUSH_SUBS_FOR_USERS.format(placeholders=placeholders)
+        rows = await self.find_all(sql, *user_ids)
+        return [
+            {
+                "user_id": row_get(r, "user_id"),
+                "endpoint": row_get(r, "endpoint"),
+                "p256dh_key": row_get(r, "p256dh_key"),
+                "auth_key": row_get(r, "auth_key"),
+                "platform": row_get(r, "platform"),
+            }
+            for r in rows
+        ]
+
+    async def update_notification_delivery_status(
+        self, notif_id: str, status: str, external_ref: str = ""
+    ) -> None:
+        """Update delivery_status (and optionally external_ref) for one notification."""
+        await self.execute(
+            Q.UPDATE_NOTIFICATION_DELIVERY_STATUS,
+            status,
+            status,
+            external_ref or "",
+            notif_id,
+        )

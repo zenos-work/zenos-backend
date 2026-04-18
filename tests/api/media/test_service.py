@@ -25,7 +25,7 @@ class _Repo:
         self.upload_calls.append((user_id, content_type, body, size))
         return "uploads/u1/file.png"
 
-    async def get(self, key):
+    async def get(self, key, options=None):
         return self.get_result
 
     async def delete(self, key):

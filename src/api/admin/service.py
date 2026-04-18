@@ -123,6 +123,15 @@ class AdminService:
             raise ValueError("notification_id is required")
         await self._repo.mark_notification_read(user_id, target)
 
+    async def delete_notification(self, user_id: str, notification_id: str) -> None:
+        target = str(notification_id or "").strip()
+        if not target:
+            raise ValueError("notification_id is required")
+        await self._repo.delete_notification(user_id, target)
+
+    async def delete_all_notifications(self, user_id: str) -> None:
+        await self._repo.delete_all_notifications(user_id)
+
     async def create_notification(
         self,
         user_id: str,
@@ -131,6 +140,8 @@ class AdminService:
         actor_id: str = None,
         article_id: str = None,
         comment_id: str = None,
+        channel: str = "in_app",
+        group_key: str = None,
     ) -> None:
         await self._repo.insert_notification(
             new_id(),
@@ -140,6 +151,8 @@ class AdminService:
             article_id,
             comment_id,
             message,
+            channel,
+            group_key,
         )
 
     async def list_content_types(self) -> dict:
@@ -271,3 +284,45 @@ class AdminService:
             "content_type_rankings": by_content_type,
             "top_category_rankings": top_categories,
         }
+
+    # ── Notification delivery dispatch ────────────────────────────────────────
+
+    async def get_pending_delivery(self, channel: str, limit: int = 100) -> dict:
+        """Fetch notifications with delivery_status='pending' for a given channel.
+        For push, also attaches active push_subscriptions per user.
+        """
+        safe_channel = channel if channel in {"email", "push", "webhook"} else "email"
+        safe_limit = max(1, min(int(limit or 100), 500))
+        rows = await self._repo.find_pending_delivery_by_channel(
+            safe_channel, safe_limit
+        )
+        if safe_channel == "push" and rows:
+            user_ids = list({r["user_id"] for r in rows})
+            subs = await self._repo.find_push_subs_for_users(user_ids)
+            subs_by_user: dict = {}
+            for sub in subs:
+                subs_by_user.setdefault(sub["user_id"], []).append(sub)
+            for row in rows:
+                row["push_subscriptions"] = subs_by_user.get(row["user_id"], [])
+        return {"notifications": rows, "count": len(rows), "channel": safe_channel}
+
+    async def bulk_update_delivery_status(self, updates: list[dict]) -> dict:
+        """Bulk-update delivery status from the delivery worker callback."""
+        succeeded = 0
+        failed = 0
+        valid_statuses = {"delivered", "failed", "bounced"}
+        for update in updates:
+            notif_id = str(update.get("id") or "").strip()
+            status = str(update.get("status") or "failed").strip()
+            external_ref = str(update.get("external_ref") or "").strip()
+            if notif_id and status in valid_statuses:
+                try:
+                    await self._repo.update_notification_delivery_status(
+                        notif_id, status, external_ref
+                    )
+                    succeeded += 1
+                except Exception:
+                    failed += 1
+            else:
+                failed += 1
+        return {"succeeded": succeeded, "failed": failed, "total": len(updates)}

@@ -1,9 +1,14 @@
 from typing import Tuple, List
+import json
+import uuid
 from api.social.repository import SocialRepository
 from api.articles.repository import ArticleRepository
 from api.users.repository import UserRepository
 from api.analytics.service import AnalyticsService
 from models.social.model import SocialActionResult
+
+
+VALID_PROVIDERS = {"linkedin", "x", "facebook", "instagram", "mastodon"}
 
 
 class SocialService:
@@ -244,30 +249,37 @@ class SocialService:
 
     # ── FOLLOWS ────────────────────────────────────
     async def toggle_follow(
-        self, follower_id: str, following_id: str, add: bool
+        self,
+        follower_id: str,
+        following_id: str,
+        add: bool,
+        following_type: str = "user",
     ) -> SocialActionResult:
-        """Follow or unfollow a user."""
-        if follower_id == following_id:
+        """Follow or unfollow a user/tag/series."""
+        if following_type == "user" and follower_id == following_id:
             raise ValueError("Cannot follow yourself")
         if add:
             try:
-                await self._repo.follow(follower_id, following_id)
+                await self._repo.follow(follower_id, following_id, following_type)
             except Exception:
                 raise ValueError("Already following")
         else:
-            await self._repo.unfollow(follower_id, following_id)
+            await self._repo.unfollow(follower_id, following_id, following_type)
         await self._analytics(
             "social.followed" if add else "social.unfollowed",
             {
                 "follower_id": follower_id,
                 "following_id": following_id,
+                "following_type": following_type,
             },
         )
         return SocialActionResult(action="follow", target_id=following_id, active=add)
 
-    async def check_following(self, follower_id: str, following_id: str) -> bool:
-        """Check if user is following another user."""
-        return await self._repo.is_following(follower_id, following_id)
+    async def check_following(
+        self, follower_id: str, following_id: str, following_type: str = "user"
+    ) -> bool:
+        """Check if user is following another entity."""
+        return await self._repo.is_following(follower_id, following_id, following_type)
 
     async def list_followers(
         self, user_id: str, page: int = 1, limit: int = 20
@@ -302,3 +314,76 @@ class SocialService:
             "followers_count": followers_count,
             "following_count": following_count,
         }
+
+    # ── CONNECTED SOCIAL ACCOUNTS (SR-024) ─────────────────
+    async def list_connected_accounts(self, user_id: str) -> list:
+        """Return the current user's connected social network accounts."""
+        rows = await self._repo.list_social_accounts(user_id)
+        return [
+            {
+                "id": row.get("id"),
+                "provider": row.get("provider"),
+                "provider_uid": row.get("provider_uid"),
+                "handle": row.get("handle"),
+                "display_name": row.get("display_name"),
+                "scopes": json.loads(row.get("scopes") or "[]"),
+                "connected_at": row.get("connected_at"),
+                "last_used_at": row.get("last_used_at"),
+                "is_active": bool(row.get("is_active", 0)),
+            }
+            for row in rows
+        ]
+
+    async def connect_social_account(
+        self,
+        user_id: str,
+        provider: str,
+        provider_uid: str,
+        access_token: str = "",
+        refresh_token: str = "",
+        token_expires_at: int = None,
+        handle: str = "",
+        display_name: str = "",
+        scopes: list = None,
+    ) -> dict:
+        """Upsert a connected social account for the user."""
+        if provider not in VALID_PROVIDERS:
+            raise ValueError(f"Unsupported provider: {provider}")
+        account_id = str(uuid.uuid4())
+        scopes_json = json.dumps(scopes or [])
+        await self._repo.upsert_social_account(
+            account_id=account_id,
+            user_id=user_id,
+            provider=provider,
+            provider_uid=provider_uid,
+            handle=handle,
+            display_name=display_name,
+            access_token=access_token,
+            refresh_token=refresh_token,
+            token_expires_at=token_expires_at,
+            scopes=scopes_json,
+        )
+        return {"provider": provider, "handle": handle, "connected": True}
+
+    async def disconnect_social_account(self, user_id: str, provider: str) -> None:
+        """Remove a connected social account."""
+        if provider not in VALID_PROVIDERS:
+            raise ValueError(f"Unsupported provider: {provider}")
+        await self._repo.delete_social_account(user_id, provider)
+
+    async def get_share_url(
+        self, provider: str, article_url: str, article_title: str
+    ) -> str:
+        """Return the platform deep-link URL for sharing an article."""
+        import urllib.parse
+
+        encoded_url = urllib.parse.quote(article_url, safe="")
+        encoded_title = urllib.parse.quote(article_title, safe="")
+        urls = {
+            "x": f"https://twitter.com/intent/tweet?text={encoded_title}&url={encoded_url}",
+            "linkedin": f"https://www.linkedin.com/sharing/share-offsite/?url={encoded_url}",
+            "facebook": f"https://www.facebook.com/sharer/sharer.php?u={encoded_url}",
+        }
+        if provider not in urls:
+            raise ValueError(f"Share URL not available for provider: {provider}")
+        return urls[provider]

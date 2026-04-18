@@ -45,8 +45,15 @@ if "js" not in sys.modules:
         def new(body=None, status=200, headers=None):
             return _ResponseInstance(body=body, status=status, headers=headers)
 
+    class _JSON:
+        @staticmethod
+        def parse(value):
+            # In the test runtime, JS `JSON.parse("null")` should be treated as Python None
+            return None
+
     js_stub.Headers = _Headers
     js_stub.Response = _Response
+    js_stub.JSON = _JSON
     sys.modules["js"] = js_stub
 
 

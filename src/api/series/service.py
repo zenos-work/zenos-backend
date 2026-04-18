@@ -99,23 +99,26 @@ class SeriesService:
         req: ArticleSeriesAssignRequest,
     ) -> bool:
         """Assign an article to a series at a specific part number."""
+        if not article_id or not series_id:
+            return False
+
         # Verify article exists and belongs to author
-        article = await self.article_service.get_by_id(article_id)
+        article = await self.article_service.get_by_id_or_slug(article_id)
         if not article or article.author_id != author_id:
             return False
 
         # Verify series exists and belongs to author
-        series = await self.get_by_id(req.series_id)
+        series = await self.get_by_id(series_id)
         if not series or series.author_id != author_id:
             return False
 
         # Check if already assigned
-        exists = await self.repo.article_series_exists(article_id, req.series_id)
+        exists = await self.repo.article_series_exists(article.id, series.id)
         if exists:
             # Update part number instead
             now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
             await self.repo.update_article_part(
-                article_id, req.series_id, req.part_number, updated_at=now
+                article.id, series.id, req.part_number, updated_at=now
             )
         else:
             # Create new assignment
@@ -123,8 +126,8 @@ class SeriesService:
             now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
             await self.repo.assign_article(
                 article_series_id=article_series_id,
-                article_id=article_id,
-                series_id=req.series_id,
+                article_id=article.id,
+                series_id=series.id,
                 part_number=req.part_number,
                 created_at=now,
                 updated_at=now,

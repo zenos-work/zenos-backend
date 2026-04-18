@@ -2,6 +2,7 @@ from typing import Optional
 from api.articles.repository import ArticleRepository
 from api.articles.moderation import ArticleModerationEngine
 from api.analytics.service import AnalyticsService
+from api.moderation.ai_detection import AIDetectionService
 from models.article.model import Article
 from models.article.requests import ArticleCreateRequest, ArticleUpdateRequest
 from models.common.pagination import PaginatedResponse
@@ -18,8 +19,13 @@ class ArticleService:
     """
 
     def __init__(self, env, ctx=None):
+        self._env = env
         self._repo = ArticleRepository(env.DB, ctx)
         self._moderation = ArticleModerationEngine()
+        self._ai_detection = AIDetectionService(
+            env.DB,
+            external_api_key=getattr(env, "AI_DETECTION_API_KEY", None),
+        )
         self._analytics_service = AnalyticsService(env, ctx)
         self._ctx = ctx
 
@@ -67,6 +73,110 @@ class ArticleService:
     async def get_related(self, article_id: str, limit: int = 5) -> list[Article]:
         """Get related articles by shared tags (Phase 2: Reader Engagement)."""
         return await self._repo.find_related(article_id, limit)
+
+    async def duplicate_article(
+        self, article_id: str, actor_id: str
+    ) -> Optional[Article]:
+        source = await self._repo.find_by_id_or_slug(article_id)
+        if not source:
+            return None
+
+        duplicate_title = (
+            f"{source.title} (Copy)" if source.title else "Untitled (Copy)"
+        )
+        duplicate_id = new_id()
+        duplicate_slug = unique_slug(duplicate_title)
+
+        try:
+            duplicated = await self._repo.insert(
+                aid=duplicate_id,
+                author_id=actor_id,
+                title=duplicate_title,
+                slug=duplicate_slug,
+                subtitle=source.subtitle,
+                content_type=source.content_type,
+                content=source.content,
+                cover_image_url=source.cover_image_url,
+                read_time=calc_read_time(source.content),
+                status=ArticleStatus.DRAFT,
+                last_verified_at=source.last_verified_at,
+                expires_at=source.expires_at or LIFELONG_EXPIRES_AT,
+                seo_title=source.seo_title,
+                seo_description=source.seo_description,
+                canonical_url=source.canonical_url,
+                og_image_url=source.og_image_url,
+                seo_schema_type=source.seo_schema_type,
+                reading_level=source.reading_level,
+                citations=source.citations,
+            )
+        except TypeError:
+            duplicated = await self._repo.insert(
+                duplicate_id,
+                actor_id,
+                duplicate_title,
+                duplicate_slug,
+                source.subtitle,
+                source.content_type,
+                source.content,
+                source.cover_image_url,
+                calc_read_time(source.content),
+                ArticleStatus.DRAFT,
+                source.last_verified_at,
+                source.expires_at or LIFELONG_EXPIRES_AT,
+                source.seo_title,
+                source.seo_description,
+                source.canonical_url,
+                source.og_image_url,
+                source.seo_schema_type,
+                source.reading_level,
+                source.citations,
+            )
+
+        source_tag_ids = [
+            tag.id for tag in (source.tags or []) if getattr(tag, "id", None)
+        ]
+        if source_tag_ids:
+            await self._repo.sync_tags(duplicate_id, source_tag_ids)
+            duplicated.tags = await self._repo._fetch_tags(duplicate_id)
+
+        await self._log(
+            "article.duplicated",
+            {
+                "source_article_id": article_id,
+                "duplicate_article_id": duplicate_id,
+                "actor_id": actor_id,
+            },
+        )
+        return duplicated
+
+    async def add_coauthor(self, article_id: str, user_id: str, added_by: str) -> dict:
+        article = await self._repo.find_by_id_or_slug(article_id)
+        if not article:
+            raise ValueError("Article not found")
+
+        if user_id == article.author_id:
+            raise ValueError("Article owner is already the primary author")
+
+        if not await self._repo.user_exists(user_id):
+            raise ValueError("User not found")
+
+        already_coauthor = await self._repo.is_coauthor(article_id, user_id)
+        if not already_coauthor:
+            await self._repo.add_coauthor(article_id, user_id, added_by)
+            await self._log(
+                "article.coauthor_added",
+                {
+                    "article_id": article_id,
+                    "user_id": user_id,
+                    "added_by": added_by,
+                },
+            )
+
+        return {
+            "article_id": article_id,
+            "user_id": user_id,
+            "added": not already_coauthor,
+        }
 
     async def create(
         self,
@@ -294,32 +404,87 @@ class ArticleService:
         return new_status
 
     async def run_auto_moderation(self, article: Article) -> dict:
+        ai_note = ""
+        enable_ai_moderation = str(
+            getattr(self._env, "ENABLE_AI_MODERATION", "true")
+        ).lower() in {"1", "true", "yes", "on"}
+
+        if enable_ai_moderation:
+            try:
+                ai_result = await self._ai_detection.scan_article(
+                    article_id=article.id,
+                    content=f"{article.title}\n\n{article.content or ''}",
+                    use_external_api=False,
+                    provider="heuristic",
+                )
+                await self._ai_detection.log_detection(article.id, ai_result)
+
+                if ai_result.decision == "auto_rejected":
+                    note = (
+                        "AI-assisted moderation rejected this submission "
+                        f"(confidence={round(ai_result.ai_probability * 100, 1)}%)."
+                    )
+                    await self._repo.set_status(
+                        article.id,
+                        ArticleStatus.REJECTED,
+                        rejection_note=note,
+                        moderation_state="AUTO_REJECTED_AI",
+                        moderation_note=note,
+                    )
+                    await self.notify_user(
+                        user_id=article.author_id,
+                        type_=NotificationType.MODERATION_REJECTED,
+                        message=note,
+                        article_id=article.id,
+                    )
+                    return {
+                        "decision": "rejected",
+                        "state": "AUTO_REJECTED_AI",
+                        "note": note,
+                    }
+
+                if ai_result.decision == "flagged_for_review":
+                    ai_note = (
+                        "AI-assisted moderation flagged this submission for manual review "
+                        f"(confidence={round(ai_result.ai_probability * 100, 1)}%)."
+                    )
+            except Exception:
+                # Keep submission flow resilient if AI detection fails.
+                pass
+
         result = self._moderation.check(article.title, article.content)
         if result.decision == "rejected":
+            rejection_note = result.note
+            if ai_note:
+                rejection_note = f"{rejection_note} {ai_note}".strip()
             await self._repo.set_status(
                 article.id,
                 ArticleStatus.REJECTED,
-                rejection_note=result.note,
+                rejection_note=rejection_note,
                 moderation_state=result.state,
-                moderation_note=result.note,
+                moderation_note=rejection_note,
             )
             await self.notify_user(
                 user_id=article.author_id,
                 type_=NotificationType.MODERATION_REJECTED,
-                message=result.note or "Auto-moderation rejected the submission.",
+                message=rejection_note or "Auto-moderation rejected the submission.",
                 article_id=article.id,
             )
             return {
                 "decision": result.decision,
                 "state": result.state,
-                "note": result.note,
+                "note": rejection_note,
             }
 
-        await self._repo.update_moderation_state(article.id, result.state, result.note)
+        pending_note = result.note or "Submission is pending admin approval."
+        if ai_note:
+            pending_note = f"{pending_note} {ai_note}".strip()
+
+        await self._repo.update_moderation_state(article.id, result.state, pending_note)
         await self.notify_user(
             user_id=article.author_id,
             type_=NotificationType.MODERATION_PENDING,
-            message=result.note or "Submission is pending admin approval.",
+            message=pending_note,
             article_id=article.id,
         )
 

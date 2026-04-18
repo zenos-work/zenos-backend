@@ -210,13 +210,13 @@ class FakeSocialService:
             raise ValueError("Not found")
         return article_id == "bookmarked"
 
-    async def toggle_follow(self, user_id, target_user_id, add):
+    async def toggle_follow(self, user_id, target_user_id, add, following_type="user"):
         self.calls.append(("toggle_follow", user_id, target_user_id, add))
         if target_user_id == "already-followed" and add:
             raise ValueError("Already followed")
         return SocialActionResult(action="follow", target_id=target_user_id, active=add)
 
-    async def check_following(self, user_id, target_user_id):
+    async def check_following(self, user_id, target_user_id, following_type="user"):
         self.calls.append(("check_following", user_id, target_user_id))
         if target_user_id == "missing":
             raise ValueError("Not found")
@@ -235,6 +235,39 @@ class FakeSocialService:
         if user_id == "missing":
             raise ValueError("Not found")
         return {"user_id": user_id, "followers_count": 5, "following_count": 3}
+
+    # SR-024 connected social account stubs
+    async def list_connected_accounts(self, user_id):
+        self.calls.append(("list_connected_accounts", user_id))
+        return [
+            {
+                "id": "acct-1",
+                "provider": "linkedin",
+                "handle": "@alice",
+                "is_active": True,
+            }
+        ]
+
+    async def connect_social_account(self, user_id, provider, provider_uid, **kwargs):
+        self.calls.append(("connect_social_account", user_id, provider, provider_uid))
+        if provider == "badprovider":
+            raise ValueError("Unsupported provider: badprovider")
+        return {
+            "provider": provider,
+            "handle": kwargs.get("handle", ""),
+            "connected": True,
+        }
+
+    async def disconnect_social_account(self, user_id, provider):
+        self.calls.append(("disconnect_social_account", user_id, provider))
+        if provider == "badprovider":
+            raise ValueError("Unsupported provider: badprovider")
+
+    async def get_share_url(self, provider, article_url, article_title):
+        self.calls.append(("get_share_url", provider, article_url, article_title))
+        if provider not in {"x", "linkedin", "facebook"}:
+            raise ValueError(f"Share URL not available for provider: {provider}")
+        return f"https://{provider}.com/share?url={article_url}"
 
 
 class SocialClient:
@@ -553,3 +586,77 @@ class TestSocialEndpoints:
             headers={"Authorization": f"Bearer {author_token}"},
         )
         assert r.status_code == 404
+
+
+class TestConnectedSocialAccounts:
+    """SR-024: Connected social network account endpoints."""
+
+    def test_list_connected_accounts(self, client, author_token):
+        r = client.get(
+            "/api/social/accounts",
+            headers={"Authorization": f"Bearer {author_token}"},
+        )
+        assert r.status_code == 200
+        data = r.json()
+        assert "data" in data
+        assert len(data["data"]) == 1
+        assert data["data"][0]["provider"] == "linkedin"
+
+    def test_connect_valid_provider(self, client, author_token):
+        r = client.post(
+            "/api/social/accounts/connect",
+            headers={"Authorization": f"Bearer {author_token}"},
+            json={
+                "provider": "linkedin",
+                "provider_uid": "uid-123",
+                "handle": "@alice",
+            },
+        )
+        assert r.status_code == 201
+        data = r.json()
+        assert data["provider"] == "linkedin"
+        assert data["connected"] is True
+
+    def test_connect_unsupported_provider_returns_400(self, client, author_token):
+        r = client.post(
+            "/api/social/accounts/connect",
+            headers={"Authorization": f"Bearer {author_token}"},
+            json={"provider": "badprovider", "provider_uid": "uid-x"},
+        )
+        assert r.status_code == 400
+
+    def test_disconnect_valid_provider(self, client, author_token):
+        r = client.delete(
+            "/api/social/accounts/linkedin",
+            headers={"Authorization": f"Bearer {author_token}"},
+        )
+        assert r.status_code == 200
+        assert r.json()["disconnected"] is True
+
+    def test_disconnect_unsupported_provider_returns_400(self, client, author_token):
+        r = client.delete(
+            "/api/social/accounts/badprovider",
+            headers={"Authorization": f"Bearer {author_token}"},
+        )
+        assert r.status_code == 400
+
+    def test_get_share_url_linkedin(self, client, author_token):
+        r = client.get(
+            "/api/social/share-url/article-1/linkedin?article_url=https%3A//zenos.work/a/test&title=Hello",
+            headers={"Authorization": f"Bearer {author_token}"},
+        )
+        assert r.status_code == 200
+        data = r.json()
+        assert data["provider"] == "linkedin"
+        assert "linkedin.com" in data["url"]
+
+    def test_get_share_url_unsupported_returns_400(self, client, author_token):
+        r = client.get(
+            "/api/social/share-url/article-1/tiktok?article_url=https://zenos.work/a/test&title=Hello",
+            headers={"Authorization": f"Bearer {author_token}"},
+        )
+        assert r.status_code == 400
+
+    def test_unauthenticated_cannot_access_accounts(self, client):
+        r = client.get("/api/social/accounts")
+        assert r.status_code == 401
