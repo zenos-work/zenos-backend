@@ -1,101 +1,99 @@
 {
-  "name": "zenos-api",
-  "main": "src/index.py",
-  "compatibility_date": "2024-12-01",
-  "compatibility_flags": ["python_workers"],
-
-  "triggers": {
-    "crons": ["0 * * * *"]
-  },
-
-  "vars": {
-    "ENVIRONMENT": "production",
-    "FRONTEND_URL": "https://zenos.work",
-    "VAPID_PUBLIC_KEY": "",
-    "VAPID_PRIVATE_KEY_HEX": "",
-    "VAPID_SUBSCRIBER": ""
-  },
-
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "prd-zenos-blog-db",
-      "database_id": "fa9659e2-584d-478f-97b9-2bcfdae5f309"
-    }
-  ],
-
-  "r2_buckets": [
-    {
-      "binding": "MEDIA",
-      "bucket_name": "prd-zenos-blog-media"
-    }
-  ],
-
-  "kv_namespaces": [
-    {
-      "binding": "SESSIONS",
-      "id": "fdb0231343a341f489c2f2c876b5a7e4"
-    }
-  ],
-
-  "env": {
-    "dev": {
-      "name": "zenos-api-dev",
-      "vars": {
-        "ENVIRONMENT": "development",
-        "FRONTEND_URL": "http://localhost:5173",
-        "VAPID_PUBLIC_KEY": "",
-        "VAPID_PRIVATE_KEY_HEX": "",
-        "VAPID_SUBSCRIBER": ""
-      },
-      "d1_databases": [
-        {
-          "binding": "DB",
-          "database_name": "prd-zenos-blog-db",
-          "database_id": "fa9659e2-584d-478f-97b9-2bcfdae5f309"
-        }
-      ],
-      "r2_buckets": [
-        {
-          "binding": "MEDIA",
-          "bucket_name": "prd-zenos-blog-media"
-        }
-      ],
-      "kv_namespaces": [
-        {
-          "binding": "SESSIONS",
-          "id": "fdb0231343a341f489c2f2c876b5a7e4"
-        }
-      ]
-    },
-    "staging": {
-      "name": "zenos-api-staging",
-      "vars": {
-        "ENVIRONMENT": "staging",
-        "FRONTEND_URL": "https://staging.zenos.work",
-        "VAPID_PUBLIC_KEY": "",
-        "VAPID_PRIVATE_KEY_HEX": "",
-        "VAPID_SUBSCRIBER": ""
-      },
-      "d1_databases": [
-        {
-          "binding": "DB",
-          "database_name": "staging-zenos-blog-db",
-          "database_id": "4aa50a0e-58a7-4898-874d-63859e6b5f11"
-        }
-      ],
-      "r2_buckets": [
-        {
-          "binding": "MEDIA",
-          "bucket_name": "staging-zenos-blog-media"
-        }
-      ],
-      "kv_namespaces": [
-        {
-          "binding": "SESSIONS",
-          "id": "4d1a91063b3340b0aee7212bbfff80c5"
-        }
-      ]
-    }
-  }
+	"name": "zenos-api",
+	"main": "src/index.py",
+	"compatibility_date": "2024-12-01",
+	"compatibility_flags": [
+		"python_workers"
+	],
+	"triggers": {
+		"crons": [
+			"0 * * * *"
+		]
+	},
+	"vars": {
+		"ENVIRONMENT": "production",
+		"FRONTEND_URL": "https://zenos.work",
+		"VAPID_PUBLIC_KEY": "",
+		"VAPID_PRIVATE_KEY_HEX": "",
+		"VAPID_SUBSCRIBER": ""
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "prd-zenos-blog-db",
+			"database_id": "fa9659e2-584d-478f-97b9-2bcfdae5f309"
+		}
+	],
+	"r2_buckets": [
+		{
+			"binding": "MEDIA",
+			"bucket_name": "prd-zenos-blog-media"
+		}
+	],
+	"kv_namespaces": [
+		{
+			"binding": "SESSIONS",
+			"id": "fdb0231343a341f489c2f2c876b5a7e4"
+		}
+	],
+	"env": {
+		"dev": {
+			"name": "zenos-api-dev",
+			"vars": {
+				"ENVIRONMENT": "development",
+				"FRONTEND_URL": "http://localhost:5173",
+				"VAPID_PUBLIC_KEY": "",
+				"VAPID_PRIVATE_KEY_HEX": "",
+				"VAPID_SUBSCRIBER": ""
+			},
+			"d1_databases": [
+				{
+					"binding": "DB",
+					"database_name": "prd-zenos-blog-db",
+					"database_id": "fa9659e2-584d-478f-97b9-2bcfdae5f309"
+				}
+			],
+			"r2_buckets": [
+				{
+					"binding": "MEDIA",
+					"bucket_name": "prd-zenos-blog-media"
+				}
+			],
+			"kv_namespaces": [
+				{
+					"binding": "SESSIONS",
+					"id": "fdb0231343a341f489c2f2c876b5a7e4"
+				}
+			]
+		},
+		"staging": {
+			"name": "zenos-api-staging",
+			"vars": {
+				"ENVIRONMENT": "staging",
+				"FRONTEND_URL": "https://staging.zenos.work",
+				"VAPID_PUBLIC_KEY": "",
+				"VAPID_PRIVATE_KEY_HEX": "",
+				"VAPID_SUBSCRIBER": ""
+			},
+			"d1_databases": [
+				{
+					"binding": "DB",
+					"database_name": "staging-zenos-blog-db",
+					"database_id": "585ecb65-b4e3-49f7-9f90-7269bd811b46"
+				}
+			],
+			"r2_buckets": [
+				{
+					"binding": "MEDIA",
+					"bucket_name": "staging-zenos-blog-media"
+				}
+			],
+			"kv_namespaces": [
+				{
+					"binding": "SESSIONS",
+					"id": "4d1a91063b3340b0aee7212bbfff80c5"
+				}
+			]
+		}
+	}
 }
