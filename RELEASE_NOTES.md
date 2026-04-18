@@ -8,9 +8,9 @@
 
 ## Validation
 
-- [ ] Backend tests pass locally
-- [ ] Lint/type checks pass locally
-- [ ] CI checks pass
+- [x] Backend tests pass locally
+- [x] Lint/type checks pass locally
+- [x] CI checks pass
 
 ## Deployment Impact
 
@@ -25,15 +25,15 @@
 - [ ] fix
 - [ ] security
 - [ ] breaking-change
-- [ ] docs
+- [x] docs
 - [ ] chore
 
 ## Checklist
 
-- [ ] Linked issue/task
-- [ ] Added/updated tests where needed
-- [ ] Updated docs/README where needed
-- [ ] No secrets committed (.env, keys, tokens)
+- [x] Linked issue/task
+- [x] Added/updated tests where needed
+- [x] Updated docs/README where needed
+- [x] No secrets committed (.env, keys, tokens)
 
 ## Notes for Release
 
