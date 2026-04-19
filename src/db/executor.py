@@ -49,7 +49,7 @@ class D1Executor:
                 return js_null
 
         if value is None:
-            return None
+            return js_null
 
         # Handle strings that look like JS nulls
         if isinstance(value, str):

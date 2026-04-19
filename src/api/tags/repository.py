@@ -25,7 +25,7 @@ class TagRepository(BaseRepository):
         name: str,
         slug: str,
         tag_type: str,
-        category_slug: str | None,
+        category_slug: str,
         is_onboarding_category: int,
     ) -> None:
         await self.execute(

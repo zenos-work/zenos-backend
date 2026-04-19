@@ -23,7 +23,7 @@ class TagService:
     async def create(self, req: TagCreateRequest) -> Tag:
         tid = new_id()
         slug = slugify(req.name)
-        category_slug = slugify(req.category_slug) if req.category_slug else None
+        category_slug = slugify(req.category_slug) if req.category_slug else ""
         await self._repo.insert(
             tid,
             req.name,
@@ -37,6 +37,6 @@ class TagService:
             name=req.name,
             slug=slug,
             tag_type=req.tag_type,
-            category_slug=category_slug,
+            category_slug=category_slug or None,
             is_onboarding_category=req.is_onboarding_category,
         )
